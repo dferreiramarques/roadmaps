@@ -18,7 +18,7 @@ node --env-file=.env server.js    # run locally (see .env.example)
 ## Layout
 - `server.js` wiring (CSP, routes) · `src/auth.js` Google sign-in session (refresh token in an encrypted cookie) · `src/public.js` `GET /api/public/:id` · `src/schema.js` cleaning of public files
 - `public/index.html` product page · `public/app.html` + `js/app.js` the app (UI) · `js/sync.js` sign-in tokens, Drive sync, sharing · `r.html` + `js/viewer.js` public page · `embed.js` widget · `app.css` design tokens + components · `js/theme.js`
-- `test/server.test.js` · `docs/NOTES.md`
+- `public/privacy.html` + `terms.html` (linked from the Google consent screen) · `public/product-page.css` · `test/server.test.js` · `test/sync.test.js` (sync.js in a vm against a fake Drive) · `docs/NOTES.md`
 
 ## Rules that matter
 1. **Dark/light changes only colours.** Colours live in tokens per theme; sizes, spacing, radii and shadow geometry are defined once in `:root`. Never put non-colour properties inside `[data-theme]` blocks. When touching UI, compare computed styles in both themes — non-colour differences must be empty. (David's global rule.)
@@ -29,6 +29,7 @@ node --env-file=.env server.js    # run locally (see .env.example)
 6. **Drive sync safety (see `sync.js`):** never save after a failed/ambiguous load; ask before overwriting a newer Drive copy; edits made offline are flagged and reconciled later; a different Google account must never inherit another account's local data; deleting or importing over a shared roadmap must revoke its public copy (queued if offline).
 7. **Phones (≤ 700 px): the top bar shows only the roadmap tabs and a ⋮ button.** Everything else (brand link, sync chip, theme toggle, export/import, sign-out) lives in `#user-menu`; mobile-only items use `.user__item--m`. New top-bar controls must be added to that menu too. Theme buttons carry `data-theme-toggle` (`theme.js` wires all of them).
 8. Keep it dependency-light (Express only). Ask before adding a dependency or a database.
+9. **The product pages of Roadmaps, Taskboards and Diagramico share one system.** The reference is the landing section of `app.css`; `public/product-page.css` is its generated extract (tokens, header, buttons, hero, sections, cards, steps, footer). Taskboards (`public/` and root copy) and Diagramico carry a copy and only override the accent tokens (`--primary*`, `--glow`). When you change the landing rules in `app.css`, regenerate `product-page.css` and copy it to those repos — a test fails when they drift. Taskboards' app header follows the Roadmaps top bar.
 
 ## Working style
 - Reply to David in Portuguese, concisely: lead with the result, then only what he needs to act on.
