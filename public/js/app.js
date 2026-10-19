@@ -48,6 +48,16 @@
   };
   const icon = name => `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON_PATHS[name]}</svg>`;
 
+  // The same colour system as the Taskboards tabs: an automatic colour per roadmap, or one you pick (right-click the tab).
+  const TAB_COLORS = ['#ff004d', '#ffa300', '#00e436', '#29adff', '#83769c', '#ff77a8', '#ffccaa', '#ab5236', '#00b543', '#7e2553', '#008751', '#c2c3c7'];
+  const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+  function autoColor(id) {
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+    return TAB_COLORS[hash % TAB_COLORS.length];
+  }
+  const colorOf = r => (HEX_COLOR.test(r.color) ? r.color : autoColor(r.id));
+
   // ── state ───────────────────────────────────────────────────────────────────────────
   let roadmaps = [];
   let current = '';
@@ -69,6 +79,7 @@
         return { id, title, description: str(it.description, 280), tag: str(it.tag, 20), tone: TONES.includes(it.tone) ? it.tone : 'secondary' };
       }).filter(Boolean);
     }
+    if (HEX_COLOR.test(raw.color)) r.color = raw.color;
     if (raw.share && /^[A-Za-z0-9_-]{10,100}$/.test(raw.share.fileId || '')) r.share = { fileId: raw.share.fileId, createdAt: Number(raw.share.createdAt) || Date.now() };
     return r;
   }
@@ -289,6 +300,19 @@
     render();
   }
 
+  // the labels (tags) already used in a roadmap, with the colour they were given
+  function tagsInUse(r) {
+    const seen = new Map();
+    for (const c of COLS) for (const it of r[c.id]) {
+      if (!it.tag) continue;
+      const k = it.tag.toLowerCase();
+      const e = seen.get(k) || { tag: it.tag, tone: it.tone, n: 0 };
+      e.n++;
+      seen.set(k, e);
+    }
+    return [...seen.values()].sort((a, b) => b.n - a.n || a.tag.localeCompare(b.tag)).slice(0, 24);
+  }
+
   // ── feature dialog ──────────────────────────────────────────────────────────────────
   function colOf(id) { const r = roadmap(); return COLS.find(c => r[c.id].some(x => x.id === id))?.id; }
 
@@ -305,6 +329,14 @@
       el('span', { class: 'tag', 'data-tone': t }, TONE_LABEL[t]))));
     paintTones();
     const colSeg = segmented(COLS, draft.col, v => { draft.col = v; });
+
+    // reuse a label that already exists in this roadmap (it brings its colour along)
+    const used = tagsInUse(roadmap());
+    const pick = used.length ? el('div', { class: 'tagpick', role: 'group', 'aria-label': 'Labels already used in this roadmap' },
+      used.map(u => el('button', { type: 'button', class: 'tag tag--btn', 'data-tone': u.tone, title: 'Use this label', onclick: () => { tag.value = u.tag; draft.tone = u.tone; paintTones(); markPicked(); } }, u.tag))) : null;
+    const markPicked = () => pick && [...pick.children].forEach((b, i) => b.setAttribute('aria-pressed', String(used[i].tag.toLowerCase() === tag.value.trim().toLowerCase())));
+    tag.addEventListener('input', markPicked);
+    markPicked();
 
     const save = () => {
       const t = str(title.value, 80);
@@ -327,6 +359,7 @@
       body: [
         field('Title', title), field('Description', desc),
         el('div', { class: 'row2' }, field('Tag', tag, 'A short label on the card.'), el('div', { class: 'field' }, el('span', { class: 'lbl' }, 'Column'), colSeg)),
+        pick && el('div', { class: 'field' }, el('span', { class: 'lbl' }, 'Labels already in this roadmap'), pick),
         el('div', { class: 'field' }, el('span', { class: 'lbl' }, 'Tag colour'), tones)
       ],
       foot
@@ -452,11 +485,158 @@
   function renderSwitcher() {
     const box = $('#roadmaps');
     box.replaceChildren(...[
-      ...roadmaps.map(r => el('button', { class: 'seg__btn seg__btn--vis', 'aria-pressed': String(r.id === current), title: r.share ? 'Public' : 'Private', onclick: () => select(r.id) },
-        el('span', { class: 'seg__vis', html: icon(r.share ? 'rocket' : 'lock') }), r.name)),
-      el('button', { class: 'seg__btn seg__add', title: 'New roadmap', 'aria-label': 'New roadmap', html: icon('plus'), onclick: () => roadmapDialog(null) })
+      ...roadmaps.map(r => {
+        const tab = el('button', { class: 'rtab', 'data-id': r.id, 'aria-pressed': String(r.id === current), title: (r.share ? 'Public' : 'Private') + ' — drag to reorder, right-click for the colour',
+          onclick: () => { if (Date.now() < suppressTabClickUntil) return; select(r.id); } },
+          el('span', { class: 'rtab__vis', html: icon(r.share ? 'rocket' : 'lock') }), el('span', { class: 'rtab__name' }, r.name));
+        tab.style.setProperty('--tab-color', colorOf(r));
+        if (tabDrag && tabDrag.active && tabDrag.id === r.id) tab.classList.add('dragging-source');
+        tab.addEventListener('contextmenu', e => { e.preventDefault(); openColorMenu(r, e.clientX, e.clientY); });
+        tab.addEventListener('pointerdown', e => onTabPointerDown(e, r, tab));
+        return tab;
+      }),
+      el('button', { class: 'rtab rtab--add', title: 'New roadmap', 'aria-label': 'New roadmap', html: icon('plus'), onclick: () => roadmapDialog(null) })
     ]);
     box.hidden = false;
+  }
+
+  // ── tab colour menu ─────────────────────────────────────────────────────────────────
+  let colorMenu = null;
+  function closeColorMenu() {
+    colorMenu?.remove();
+    colorMenu = null;
+    document.removeEventListener('pointerdown', onMenuOutside, true);
+    document.removeEventListener('keydown', onMenuKey, true);
+    window.removeEventListener('resize', closeColorMenu);
+  }
+  const onMenuOutside = e => { if (colorMenu && !colorMenu.contains(e.target)) closeColorMenu(); };
+  const onMenuKey = e => { if (e.key === 'Escape') { e.stopPropagation(); closeColorMenu(); } };
+
+  function setRoadmapColor(id, color) {
+    const r = roadmaps.find(x => x.id === id);
+    if (!r) return;
+    if (color && HEX_COLOR.test(color)) r.color = color; else delete r.color;   // no colour = back to automatic
+    touch();
+  }
+
+  function openColorMenu(r, x, y) {
+    closeColorMenu();
+    const current = colorOf(r).toLowerCase();
+    const grid = el('div', { class: 'color-menu__grid' }, TAB_COLORS.map(c => {
+      const sw = el('button', { type: 'button', class: 'color-menu__sw' + (c === current ? ' active' : ''), 'aria-label': 'Colour ' + c, onclick: () => { setRoadmapColor(r.id, c); closeColorMenu(); } });
+      sw.style.background = c;
+      return sw;
+    }));
+    const custom = el('input', { type: 'color', 'aria-label': 'Custom colour', value: current });
+    custom.addEventListener('change', () => { setRoadmapColor(r.id, custom.value); closeColorMenu(); });
+    const menu = el('div', { class: 'color-menu', role: 'dialog', 'aria-label': 'Roadmap colour' },
+      el('div', { class: 'color-menu__title' }, 'Roadmap colour'), grid,
+      el('div', { class: 'color-menu__row' },
+        el('label', { class: 'color-menu__custom' }, 'Custom ', custom),
+        el('button', { type: 'button', class: 'btn btn--outline btn--sm', onclick: () => { setRoadmapColor(r.id, null); closeColorMenu(); } }, 'Auto')));
+    document.body.append(menu);
+    colorMenu = menu;
+    const b = menu.getBoundingClientRect();                       // keep it on screen
+    menu.style.left = Math.max(8, Math.min(x, innerWidth - b.width - 8)) + 'px';
+    menu.style.top = Math.max(8, Math.min(y, innerHeight - b.height - 8)) + 'px';
+    document.addEventListener('pointerdown', onMenuOutside, true);
+    document.addEventListener('keydown', onMenuKey, true);
+    window.addEventListener('resize', closeColorMenu);
+  }
+
+  // ── tab drag to reorder (pointer based: mouse and touch; a long-press on touch opens the colour menu) ──
+  let tabDrag = null;
+  let suppressTabClickUntil = 0;
+
+  function onTabPointerDown(e, r, tabEl) {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    tabDrag = { id: r.id, tabEl, startX: e.clientX, startY: e.clientY, active: false, insertIdx: null };
+    if (e.pointerType === 'touch') {
+      tabDrag.pressTimer = setTimeout(() => {
+        if (!tabDrag || tabDrag.active) return;
+        const { startX, startY } = tabDrag;
+        endTabDrag();
+        suppressTabClickUntil = Date.now() + 500;
+        openColorMenu(r, startX, startY);
+      }, 550);
+    }
+    document.addEventListener('pointermove', onTabPointerMove);
+    document.addEventListener('pointerup', onTabPointerUp);
+    document.addEventListener('pointercancel', onTabPointerUp);
+  }
+
+  function onTabPointerMove(e) {
+    const d = tabDrag;
+    if (!d) return;
+    if (!d.active) {
+      if (Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < 6) return;
+      clearTimeout(d.pressTimer);
+      if (roadmaps.length < 2) { endTabDrag(); return; }
+      d.active = true;
+      const rect = d.tabEl.getBoundingClientRect();
+      d.grabDX = d.startX - rect.left;
+      d.ghost = d.tabEl.cloneNode(true);
+      d.ghost.classList.add('rtab-ghost');
+      d.ghost.style.width = rect.width + 'px';
+      d.ghost.style.height = rect.height + 'px';
+      document.body.append(d.ghost);
+      d.marker = el('div', { class: 'rtab-marker' });
+      document.body.append(d.marker);
+      d.tabEl.classList.add('dragging-source');
+      document.body.classList.add('tab-dragging');
+    }
+    e.preventDefault();
+    const bar = $('#roadmaps').getBoundingClientRect();
+    d.ghost.style.left = (e.clientX - d.grabDX) + 'px';
+    d.ghost.style.top = bar.top + 'px';
+
+    // where would it land? (index in the list without the dragged roadmap)
+    const others = [...document.querySelectorAll('#roadmaps .rtab:not(.rtab--add)')].filter(t => t.dataset.id !== d.id);
+    const inBar = e.clientY > bar.top - 50 && e.clientY < bar.bottom + 50;     // let go far away = cancel
+    if (!inBar || !others.length) { d.insertIdx = inBar ? roadmaps.findIndex(x => x.id === d.id) : null; d.marker.style.display = 'none'; return; }
+    let k = 0;
+    while (k < others.length) { const rr = others[k].getBoundingClientRect(); if (e.clientX < rr.left + rr.width / 2) break; k++; }
+    const rest = roadmaps.filter(x => x.id !== d.id);
+    const ref = k < others.length ? others[k] : others[others.length - 1];
+    const refIdx = rest.findIndex(x => x.id === ref.dataset.id);
+    d.insertIdx = k < others.length ? refIdx : refIdx + 1;
+    const rr = ref.getBoundingClientRect();
+    d.marker.style.left = ((k < others.length ? rr.left : rr.right) - 4) + 'px';
+    d.marker.style.top = rr.top + 'px';
+    d.marker.style.height = rr.height + 'px';
+    d.marker.style.display = 'block';
+  }
+
+  function endTabDrag() {
+    const d = tabDrag;
+    if (!d) return;
+    clearTimeout(d.pressTimer);
+    d.ghost?.remove();
+    d.marker?.remove();
+    document.body.classList.remove('tab-dragging');
+    document.querySelectorAll('.rtab.dragging-source').forEach(t => t.classList.remove('dragging-source'));
+    document.removeEventListener('pointermove', onTabPointerMove);
+    document.removeEventListener('pointerup', onTabPointerUp);
+    document.removeEventListener('pointercancel', onTabPointerUp);
+    tabDrag = null;
+  }
+
+  function onTabPointerUp(e) {
+    const d = tabDrag;
+    if (!d) return;
+    const commit = d.active && e.type === 'pointerup' && d.insertIdx != null;
+    const { id, insertIdx, active } = d;
+    endTabDrag();
+    if (active) suppressTabClickUntil = Date.now() + 400;      // the drop must not also select the tab
+    if (commit) reorderRoadmap(id, insertIdx);
+  }
+
+  function reorderRoadmap(id, toIndex) {
+    const from = roadmaps.findIndex(r => r.id === id);
+    if (from < 0) return;
+    const [moved] = roadmaps.splice(from, 1);
+    roadmaps.splice(Math.max(0, Math.min(toIndex, roadmaps.length)), 0, moved);
+    if (roadmaps.findIndex(r => r.id === id) !== from) touch(); else renderAll();
   }
 
   function renderHero() {

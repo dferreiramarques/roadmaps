@@ -3,7 +3,8 @@
 Plan a product roadmap in minutes, keep it private until you're ready, then share a page or embed it on your website.
 **Sign in with Google; your roadmaps live in your own Google Drive.** There is no database.
 
-- **Now / Next / Later** columns for each of your products — drag, tag, edit (Aura-style UI, light and dark).
+- **Now / Next / Later** columns for each of your products — drag, tag, edit (Aura-style UI, light and dark). Labels you already used in a roadmap are offered when you add a card.
+- **Coloured tabs like Taskboards:** each roadmap has its own colour (automatic, or right-click the tab to pick one); drag the tabs to reorder them.
 - **Private by default.** Press **Share → Make public** to get a **public page** and an **embed snippet**. Make it private again and both stop working.
 - **Always a Roadmaps address.** The page is `https://<this site>/r/<id>` and the snippet loads `https://<this site>/embed.js`, so every share starts from here.
 - **Your data stays yours.** All your roadmaps are one file in the private app folder of *your* Drive; a public roadmap is a copy that exists only while it is shared.

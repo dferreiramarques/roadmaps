@@ -400,10 +400,55 @@ a.btn { text-decoration: none; }
 .user__item:hover { background: var(--surface-2); }
 .user__sep { height: 1px; background: var(--border); margin: 6px 4px; }
 
-/* roadmap switcher: lock / rocket before the name */
-.seg__btn--vis { display: inline-flex; align-items: center; gap: 6px; }
-.seg__vis { display: inline-flex; opacity: .8; }
-.seg__vis .ico { width: 14px; height: 14px; }
+/* roadmap tabs — the Taskboards colour system: each tab has its own colour (automatic, or picked with a right-click) */
+.rtabs { display: flex; align-items: center; gap: 6px; max-width: 100%; overflow-x: auto; scrollbar-width: none; padding: 2px; }
+.rtabs::-webkit-scrollbar { display: none; }
+.rtab {
+  --tab-color: var(--primary);
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 12px;
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--surface-2); color: var(--muted);
+  font-size: .8125rem; font-weight: 500; white-space: nowrap; user-select: none; touch-action: none;
+  transition: background var(--fast), color var(--fast), border-color var(--fast), box-shadow var(--fast);
+}
+.rtab:hover { color: var(--text); background: var(--surface-3); }
+.rtab__vis { display: inline-flex; color: var(--tab-color); }
+.rtab__vis .ico { width: 14px; height: 14px; }
+.rtab[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--tab-color) 12%, var(--surface));
+  border-color: var(--tab-color); color: var(--tab-color); font-weight: 600; box-shadow: var(--sh-sm);
+}
+.rtab--add { width: 32px; padding: 0; justify-content: center; border-style: dashed; background: transparent; }
+.rtab.dragging-source { opacity: .35; }
+.rtab-ghost { position: fixed; z-index: 9999; pointer-events: none; opacity: .92; box-shadow: var(--sh-lg); transform: rotate(-1.5deg); }
+.rtab-marker { position: fixed; z-index: 9998; width: 3px; border-radius: 2px; background: var(--primary); box-shadow: 0 0 6px var(--primary); pointer-events: none; display: none; }
+body.tab-dragging, body.tab-dragging * { cursor: grabbing !important; }
+
+/* colour menu (right-click a tab) */
+.color-menu { position: fixed; z-index: 9999; width: 220px; padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--sh-lg); animation: fade var(--fast) var(--ease); }
+.color-menu__title { margin-bottom: 8px; font-size: .6875rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--subtle); }
+.color-menu__grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+.color-menu__sw { width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 2px solid transparent; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .25); }
+.color-menu__sw:hover { transform: scale(1.12); }
+.color-menu__sw.active { border-color: var(--text); }
+.color-menu__row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; }
+.color-menu__custom { display: flex; align-items: center; gap: 8px; font-size: .8125rem; color: var(--muted); }
+.color-menu__custom input { width: 32px; height: 26px; padding: 0; border: 1px solid var(--border-strong); border-radius: 4px; background: none; cursor: pointer; }
+
+/* labels already used in a roadmap (feature dialog) */
+.tagpick { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag--btn { border: 0; cursor: pointer; font-family: inherit; transition: filter var(--fast), box-shadow var(--fast); }
+.tag--btn:hover { filter: brightness(1.15); }
+.tag--btn[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--tone); }
+
+/* cards: no empty footer on a title-only card; the edit buttons float over the corner instead.
+   (On touch screens there is no hover, so the buttons stay in the footer row.) */
+@media (hover: hover) {
+  .card__foot { margin-top: 0; min-height: 0; }
+  .card__foot:has(.tag) { margin-top: 12px; min-height: 26px; }
+  .card__actions { position: absolute; top: 8px; right: 8px; margin: 0; padding: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--sh-sm); }
+}
 
 /* chips that open the share dialog */
 .chip--btn { border: 0; cursor: pointer; }
