@@ -1,6 +1,6 @@
 # Roadmaps — product notes and hand-off
 
-Updated 2026-10-19. A new working session can start from this file. **Status: v0.2 is deployed at https://roadmaps.monco.io (Railway, custom domain) with its own Google Cloud project; sign-in works.**
+Updated 2026-10-19. A new working session can start from this file. **Status: v0.2 is deployed at https://roadmaps.monco.io (Railway, custom domain) with its own Google Cloud project; sign-in works, the consent screen is In production (privacy and terms pages at `/privacy` and `/terms`). The Taskboards and Diagramico landings show their roadmaps from here through the embed; the three product pages and the Taskboards app header share the Roadmaps design system (see CLAUDE.md rule 9).**
 
 ## 1. What and why
 
@@ -26,12 +26,12 @@ History: it started as an editor page inside Taskboards (`roadmap.html`, localSt
 - Sync (`public/js/sync.js`): token lifecycle, Drive load/save with conflict prompt, offline editing + reconcile, share create/publish/revoke with a durable revoke queue, account-switch safety.
 - 7 server tests passing (schema cleaning, public proxy incl. rate limit/cache/ETag, Google sign-in against a fake Google, pages + CSP). The client was tested end to end in a browser against a fake Google and a fake Drive: sign-in, create, autosave, re-consent for `drive.file`, make public, public page through the proxy, auto-publish on edit, make private, delete a shared roadmap, offline edit → reconnect, export/import, sign-out.
 - **Not done:** History/revisions (v0.1 had them on the server; with Drive they would need a Drive-side approach), multi-editor collaboration, analytics.
-- **Open (Google):** the consent screen is still **Testing** — *Publish app* stayed greyed out ("finish the configuration on the Branding page") even with Branding saved, the Drive scopes added and the optional domain fields cleared. Until it is **In production**, only listed test users can sign in and their sign-in expires after 7 days. Things to try: save Branding again and reload *Audience*; look at *Verification Center*; wait a few minutes after creating the project; add privacy-policy and terms links once there is a page for them.
+- **Google consent screen: In production** (done 2026-10-19). Branding has the home page, `/privacy`, `/terms` and the `monco.io` authorized domain; Data access lists `drive.appdata`, `drive.file`, `openid`, `userinfo.email` and `userinfo.profile` (without the last three the app showed "You" and no avatar).
 
 ## 4. Setup checklist (Google + Railway)
 
 Done on 2026-10-19 except where marked. The step-by-step is in the README ("Set up Google").
-1. Google Cloud (own project `roadmaps`): Drive API enabled, consent screen External + Branding, Data access scopes `drive.appdata` + `drive.file`, **Web client** with redirect `https://roadmaps.monco.io/auth/callback`, **API key** restricted to the Drive API (no application restriction). ⚠ Consent screen still in *Testing* — see "Open (Google)" above.
+1. Google Cloud (own project `roadmaps`): Drive API enabled, consent screen External + Branding, Data access scopes `drive.appdata` + `drive.file`, **Web client** with redirect `https://roadmaps.monco.io/auth/callback`, **API key** restricted to the Drive API (no application restriction).
 2. Railway variables: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `COOKIE_SECRET`, `DRIVE_API_KEY`, `PUBLIC_URL=https://roadmaps.monco.io`. The old v0.1 variables (`ADMIN_TOKEN`, `SESSION_SECRET`, `DATA_DIR`) and the Volume are not used. Gotcha: Railway's *Suggested variables* are only saved after clicking **Add**; `/api/config` showed `signIn:false` until `COOKIE_SECRET` was really added.
 3. Custom domain `roadmaps.monco.io` is live.
 4. Smoke test: `/healthz`, `/api/config` (both `true`), sign in at `/app`, create a roadmap, make it public, open `/r/<id>` in a private window, make it private, check the page stops (≤ 30 s because of the cache).
@@ -53,7 +53,7 @@ Done on 2026-10-19 except where marked. The step-by-step is in the README ("Set 
 
 ## 7. Suggested plan
 
-- **Phase 1 — ship:** (setup done; get the consent screen **In production**), recreate the Taskboards and Diagramico roadmaps, embed them on both product pages, retire the old copies.
+- **Phase 1 — ship:** done: consent screen In production, Taskboards and Diagramico roadmaps recreated here and embedded on both product pages (Diagramico shows the English roadmap in both languages), `taskboards/roadmap.html` redirects here. Left: retire the old copies (`roadmap.js`, `roadmap.css`, `roadmap-embed.js`, `roadmap.json` in Taskboards; the service worker still lists `roadmap-embed.js`).
 - **Phase 2 — polish:** (roadmap ordering and per-roadmap colour are done) duplicate roadmap, a privacy page + terms linked from the consent screen, "last updated" control, nicer public page header, RSS/Atom feed of changes.
 - **Phase 3 — richer items:** status/dates/links, Shipped/changelog, PT/EN translations.
 - **Phase 4 — audience:** opt-in subscribe, votes, analytics (settle privacy and a database first).
@@ -63,7 +63,7 @@ Done on 2026-10-19 except where marked. The step-by-step is in the README ("Set 
 
 Open this repository in Claude Code and paste:
 
-> You're continuing the **Roadmaps** app (see `CLAUDE.md` and `docs/NOTES.md`). Version 0.2 — Google sign-in, data in the user's Drive, public pages and an embed widget — is deployed at https://roadmaps.monco.io and sign-in works. First run `npm test` and `git status`, and check `/healthz` and `/api/config` from the outside. Then help me get the Google consent screen from *Testing* to *In production* (see "Open (Google)" in section 3), and move on to Phase 1: recreate the Taskboards and Diagramico roadmaps here and embed them. I'll answer the open questions in section 6 as we go; for anything that changes the design ask me one short question first. Reply in Portuguese, concisely, and don't commit or push until I say so.
+> You're continuing the **Roadmaps** app (see `CLAUDE.md` and `docs/NOTES.md`). Version 0.2 — Google sign-in, data in the user's Drive, public pages and an embed widget — is deployed at https://roadmaps.monco.io and sign-in works. First run `npm test` and `git status`, and check `/healthz` and `/api/config` from the outside. Then continue with Phase 2 (see section 7). I'll answer the open questions in section 6 as we go; for anything that changes the design ask me one short question first. Reply in Portuguese, concisely, and don't commit or push until I say so.
 
 ## 9. References
 

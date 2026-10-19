@@ -2,6 +2,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
+const fs = require('node:fs');
+const path = require('node:path');
 const { createApp } = require('../server');
 const { cleanPublic } = require('../src/schema');
 
@@ -203,7 +205,7 @@ test('pages, assets and security headers', async () => {
   const s = await listen(createApp({ env: {} }));
   try {
     assert.equal((await (await fetch(s.base + '/healthz')).json()).ok, true);
-    for (const p of ['/', '/app', '/r/abcdefghij', '/privacy', '/terms', '/app.css', '/js/app.js', '/js/sync.js']) assert.equal((await fetch(s.base + p)).status, 200, p);
+    for (const p of ['/', '/app', '/r/abcdefghij', '/privacy', '/terms', '/app.css', '/product-page.css', '/js/app.js', '/js/sync.js']) assert.equal((await fetch(s.base + p)).status, 200, p);
     const landing = await (await fetch(s.base + '/')).text();
     assert.match(landing, /now, next and later/);
     assert.ok(!/style="/.test(landing) && !/<script>/.test(landing), 'no inline styles or scripts (the CSP forbids them)');
@@ -216,4 +218,12 @@ test('pages, assets and security headers', async () => {
     assert.ok(!/unsafe-inline/.test(csp));
     assert.equal(embed.headers.get('x-content-type-options'), 'nosniff');
   } finally { await s.close(); }
+});
+
+test('product-page.css (copied into the Taskboards and Diagramico repos) still matches the landing rules in app.css', () => {
+  const read = f => fs.readFileSync(path.join(__dirname, '..', 'public', f), 'utf8').replace(/\r\n/g, '\n');
+  const marker = '/* ── product page (landing)';
+  const landing = read('app.css').slice(read('app.css').indexOf(marker));
+  assert.ok(landing.length > 500);
+  assert.ok(read('product-page.css').includes(landing), 'regenerate product-page.css from app.css and copy it to the other repos');
 });
