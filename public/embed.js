@@ -1,11 +1,12 @@
 /* Roadmap widget — shows a product's NOW / NEXT / LATER columns on any page.
  *
- *   <div data-roadmap="my-product"></div>
+ *   <div data-roadmap="THE-ID-FROM-THE-SHARE-DIALOG" data-header="true"></div>
  *   <script src="https://YOUR-ROADMAPS-HOST/embed.js" defer></script>
  *
  * Optional attributes on the div:
  *   data-header="true"          also show the product name, tagline and link above the columns
- *   data-src="…/roadmap.json"   where to read the data from (default: /api/roadmap.json on the host that served this script)
+ *   data-src="…"                where to read the data from (default: /api/public/<id> on the host that served this script;
+ *                               a file shaped like {products:[…]} is understood too)
  *   data-theme="light|dark"     force a theme (default: follows <html data-theme> or the OS setting)
  *
  * It renders inside a shadow root, so the host page's CSS can't break it and it can't break the page.
@@ -129,8 +130,9 @@
       root.append(hero);
     }
     root.append(cols);
-    if (/^\d{4}-\d{2}-\d{2}$/.test(updatedAt || '')) {
-      var d = new Date(updatedAt + 'T00:00:00');
+    var day = String(updatedAt || '').slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+      var d = new Date(day + 'T00:00:00');
       root.append(el('p', 'foot', 'Last updated ' + d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })));
     }
   }
@@ -156,12 +158,13 @@
     wrap.append(inner);
     inner.append(el('div', 'msg', 'Loading roadmap…'));
 
-    var src = host.getAttribute('data-src') || BASE + 'api/roadmap.json';
+    var wanted = host.getAttribute('data-roadmap') || '';
+    var src = host.getAttribute('data-src') || BASE + 'api/public/' + encodeURIComponent(wanted);
     var header = host.hasAttribute('data-header') && host.getAttribute('data-header') !== 'false';
     fetch(src, { cache: 'no-cache' })
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(function (raw) {
-        var p = find(raw, host.getAttribute('data-roadmap') || '');
+        var p = raw && Array.isArray(raw.products) ? find(raw, wanted) : raw;
         if (!p) throw new Error('unknown product');
         render(inner, p, raw.updatedAt, header);
       })

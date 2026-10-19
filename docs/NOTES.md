@@ -1,68 +1,70 @@
 # Roadmaps — product notes and hand-off
 
-Written on 2026-10-19 at the end of the session that built the first version, so a new working session can start with full context.
+Updated 2026-10-19. A new working session can start from this file.
 
 ## 1. What and why
 
-David has several small products (Taskboards, Diagramico, others to come) and wants **one place to define each product's roadmap** and **show it on each product's own page** ("what we're building now, next and later"). The roadmap is also a way to collect interest before building (waitlists), so it should look careful and credible.
+David has several small products (Taskboards, Diagramico, more to come) and wants a place to **define each product's roadmap and show it on the product's own page** ("what we're building now, next and later"). It also works as a way to collect interest before building. It is meant to become a **product of its own**: anyone signs in with Google, creates roadmaps for their products, keeps them private, and makes them public (page + embed snippet) when ready — all anchored on this site's address.
 
-It started as a page inside Taskboards (`roadmap.html`, an editor that exported `roadmap.json`). That editor moved into **this app**, hosted on Railway, so editing is no longer tied to one product's repo. Taskboards keeps `roadmap.html` as a **read-only** viewer and the widget (`roadmap-embed.js`), and will read its data from here.
+History: it started as an editor page inside Taskboards (`roadmap.html`, localStorage + exported `roadmap.json`). Version 0.1 was a token-protected admin with file storage on a Railway Volume. **Version 0.2 (current) replaced that** with the Taskboards model: Google sign-in, data in the user's own Drive, nothing stored by the server.
 
-## 2. Decisions already taken
+## 2. Decisions taken
 
-- **Columns:** Now / Next / Later, vertical lists, one set per product. Items: title, description, a coloured tag (free text + one of 6 tones: success, info, warn, danger, secondary, contrast).
-- **Look:** PrimeNG **Aura**-inspired — zinc surfaces, emerald primary, 6 px controls / 12 px panels, tinted tags, soft focus rings. Dark and light themes that only swap colours (David's rule, see `CLAUDE.md`).
-- **Data is public by design**; per-product `visibility` (public/private). Only the owner edits.
-- **Hosting:** Railway, one service, a **Volume** at `/data`. Prefer a **same-site custom domain** (e.g. `roadmap.monco.io` — David's products live under `monco.io`) so any future cookies are first-party.
-- **Storage:** one JSON file per product + a numbered revision per change (no database yet) — chosen for zero setup, easy backups and "no data we shouldn't hold". Public data only.
-- **Auth (MVP):** one `ADMIN_TOKEN` → signed httpOnly cookie. Same-origin JSON only for writes. Good enough for a single owner; replace with Google sign-in when more editors are needed (the rest of the code only relies on `isAdmin(req)` / `requireAdmin`).
-- **Embed:** `embed.js` — shadow-root widget, text-only rendering, follows the host page's theme, works on pages with strict CSP.
-- **David's working style:** Portuguese conversation, concise answers, commit/push only when asked, tests + a real-browser check for UI work.
+- **Product page** at `/` (similar in structure to Taskboards' landing: hero, example board, features, how it works, embed, privacy). The app lives at `/app`.
+- **Access = Google account**, exactly like Taskboards: the server keeps a refresh token in an encrypted cookie (`src/auth.js`, copied from Taskboards' session server), the browser talks to Drive directly. Same-origin, so no CORS/third-party-cookie problems.
+- **Storage = the user's Drive**: one private file `roadmaps-data.json` (app folder, scope `drive.appdata`). No database, no Volume on Railway.
+- **Private by default; public on demand.** *Make public* creates a separate Drive file readable by "anyone with the link" (scope `drive.file`), kept in sync on every edit; *Make private* (or deleting the roadmap) deletes it. The public copy has no ids and no account data.
+- **Shares always start from this site:** page `https://<site>/r/<fileId>`, snippet `<div data-roadmap="<fileId>" data-header="true"></div><script src="https://<site>/embed.js" defer></script>`.
+- **Visitors never talk to Google:** `GET /api/public/<fileId>` reads the public file with a **server-side API key**, validates/cleans it, caches 30 s, open CORS. Chosen over a browser-side API key because a key restricted by HTTP referrer would break on every site that embeds the widget.
+- **UI:** PrimeNG **Aura**-inspired (zinc surfaces, emerald primary, 6 px controls / 12 px panels, tinted tags). Dark/light only swap colours (David's rule, see `CLAUDE.md`). English UI.
+- **Working style:** Portuguese conversation, concise, commit/push only when asked, tests + a real-browser check for UI work.
 
-## 3. What exists now (v0.1.0, local — not deployed yet)
+## 3. What exists now
 
-- Admin editor (`/admin`): sign in, products as tabs, add/edit/delete features and products, drag & drop + ‹ › buttons + Alt+arrows, autosave with status chip, **History** (restore), **conflict dialog** (409) when another tab changed the product, Export / Import, visibility toggle, link to the public page.
-- Public: directory `/`, product page `/p/<id>`, `GET /api/roadmap.json`, `embed.js`.
-- Storage with revisions, trash, atomic writes; validation/sanitising of everything that comes in.
-- 13 automated API tests, all passing (`npm test`). The admin UI was smoke-tested in a browser (login, CRUD, autosave, visibility, history/restore, conflicts, public pages, sign-out).
-- `seed/roadmap.json`: example data for Taskboards and Diagramico (copied from Taskboards' `roadmap.json`; the Taskboards items were written during the session from the pricing/plans discussion — **David should review/replace them**; Diagramico's come from its own public roadmap, EN).
-- Not done: deployment, domain, product ordering UI (API `PUT /api/order` exists), item drag between products, any analytics.
+- Product page, sign-in gate, the app (roadmaps as tabs with a lock/rocket icon, hero with *Edit* / *Share*, three columns, drag & drop + ‹ › + Alt+arrows, autosave status chip, user menu with Export/Import/Sign out), share dialog (private ⇄ public, page link, embed snippet, copy buttons), public page, widget.
+- Sync (`public/js/sync.js`): token lifecycle, Drive load/save with conflict prompt, offline editing + reconcile, share create/publish/revoke with a durable revoke queue, account-switch safety.
+- 7 server tests passing (schema cleaning, public proxy incl. rate limit/cache/ETag, Google sign-in against a fake Google, pages + CSP). The client was tested end to end in a browser against a fake Google and a fake Drive: sign-in, create, autosave, re-consent for `drive.file`, make public, public page through the proxy, auto-publish on edit, make private, delete a shared roadmap, offline edit → reconnect, export/import, sign-out.
+- **Not done:** deploy of v0.2, History/revisions (v0.1 had them on the server; with Drive they would need a Drive-side approach), ordering roadmaps by drag, multi-editor collaboration, analytics.
 
-## 4. Connect the other apps (the first jobs after deploying)
+## 4. Setup checklist (Google + Railway)
 
-1. **Taskboards** (`D:\Documents\GitHub\taskboards`, repo `dferreiramarques/taskboards`, site `taskboards.monco.io` on GitHub Pages, Railway service for the session server at `auth.monco.io`):
-   - `roadmap.html` + `roadmap.js` are the read-only viewer; `roadmap-embed.js` is the widget used on the landing page (`<div data-roadmap="taskboards">`).
-   - They read `ROADMAP_SRC` from `config.js` (default: the local `roadmap.json`). After deploying here set `ROADMAP_SRC: 'https://<roadmaps-host>/api/roadmap.json'`, push, then retire `roadmap.json` there (or keep it as a fallback).
-   - Cross-origin is fine: `/api/roadmap.json` sends `Access-Control-Allow-Origin: *`.
-2. **Diagramico** (`D:\Documents\GitHub\diagramico`): its landing page has the roadmap hard-coded (`ROAD` in `index.html`, PT + EN) and `docs/ROADMAP.md` as the long version. Replace the hard-coded block with `<div data-roadmap="diagramico" data-header="false">` + the script. It is bilingual — see open question about languages.
-3. Any other app: same two lines of HTML.
+1. Google Cloud: OAuth Web client with redirect `https://<site>/auth/callback`; Data access scopes `drive.appdata` + `drive.file`; consent screen **In production**; an **API key restricted to the Drive API** (no referrer restriction — the server uses it). Reusing the Taskboards project is fine; a separate client keeps branding and the app folder apart.
+2. Railway variables: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `COOKIE_SECRET`, `DRIVE_API_KEY` (+ `PUBLIC_URL` only if redirects are wrong). Remove the old v0.1 variables (`ADMIN_TOKEN`, `SESSION_SECRET`, `DATA_DIR`) and the Volume.
+3. Custom domain (e.g. `roadmap.monco.io`) + the CNAME; add its `/auth/callback` to the OAuth client.
+4. Smoke test: `/healthz`, `/api/config` (both `true`), sign in at `/app`, create a roadmap, make it public, open `/r/<id>` in a private window, make it private, check the page stops (≤ 30 s because of the cache).
 
-## 5. Open questions for David
+## 5. Connect the other apps
 
-1. **Name** of the product (working name "Roadmaps") and the **domain** (`roadmap.monco.io`?).
-2. **Auth:** keep the single token, or move to Google sign-in with an allowed-email list now? (Taskboards already has a Google OAuth client and a session server at `auth.monco.io` to copy the pattern from.)
-3. **Languages:** Diagramico is PT/EN. Should items carry translations (`title: {pt, en}`) and the widget pick by `lang`?
-4. **Item model:** add status/ETA, a link ("read more"), votes or "I want this" (feeds the waitlist idea)? A fourth **"Shipped"/changelog** column or a separate changelog?
-5. **Storage:** files on a Volume are fine for now. Move to Postgres only if we need multi-user, queries, or per-user audit.
-6. **Visitors:** subscribe-for-updates, voting, comments — worth it? (They would make the app hold personal data → privacy notice, GDPR.)
-7. **Per-product settings:** custom accent colour, hide the "Last updated" line, API keys for private roadmaps?
+- **Taskboards** (`D:\Documents\GitHub\taskboards`, `taskboards.monco.io`): `roadmap.html` / `roadmap.js` are a read-only viewer and `roadmap-embed.js` a widget, both reading `ROADMAP_SRC` from `config.js` (default: the local `roadmap.json`). With this app live: create the Taskboards roadmap here (Import accepts the old `roadmap.json` shape), make it public, then either embed `<div data-roadmap="<id>">` + this site's `/embed.js` on the landing page, or point `ROADMAP_SRC` at `https://<site>/api/public/<id>` (the viewer/widget understand a single-roadmap response as well as the old `{products:[…]}` file — check the Taskboards viewer first, it only knows the old shape).
+- **Diagramico** (`D:\Documents\GitHub\diagramico`): its landing has the roadmap hard-coded (`ROAD` in `index.html`, PT + EN). Replace it with the two-line embed once its roadmap exists here.
 
-## 6. Suggested plan
+## 6. Open questions for David
 
-- **Phase 1 — ship it:** deploy to Railway (Volume + variables + domain) → import/confirm the data → point Taskboards (`ROADMAP_SRC`) and Diagramico (widget) at it → retire the old copies.
-- **Phase 2 — editors:** Google sign-in with allowed emails, "last edited by" in history, product ordering by drag, product duplication.
-- **Phase 3 — richer roadmaps:** item status/dates/links, Shipped column or changelog, PT/EN translations, per-product theme colour, RSS/Atom feed of changes.
-- **Phase 4 — audience:** opt-in subscribe, voting, simple analytics (which items get attention) — each with its privacy implications settled first.
-- **Phase 5 — scale:** Postgres, roles, API keys, webhooks.
+1. **Name and domain** (working name "Roadmaps"; `roadmap.monco.io`?).
+2. **One OAuth client or a separate one** for this product (branding on the consent screen, separate app folder).
+3. **Languages:** Diagramico is PT/EN — should items carry translations and the widget pick by `lang`?
+4. **Item model:** status/ETA, a "read more" link, votes / "I want this" (feeds a waitlist), a **Shipped** column or changelog?
+5. **History:** is a per-roadmap version history needed? (Drive's app-folder files have none that users can see; options: keep N snapshots inside the data file, or a second Drive file.)
+6. **Collaboration:** several editors per roadmap (shared Drive file + merge — the hard part Taskboards also postponed)?
+7. **Visitors:** subscribe-for-updates, votes, comments? They would make the server hold personal data → privacy notice/GDPR, and probably a database.
+8. **Monetisation:** free for personal use; teams / "install in your own Google Workspace or Microsoft 365" as a paid, service-led plan (see Taskboards' plans page).
 
-## 7. Start a new working session
+## 7. Suggested plan
+
+- **Phase 1 — ship:** Google + Railway setup (section 4), recreate the Taskboards and Diagramico roadmaps, embed them on both product pages, retire the old copies.
+- **Phase 2 — polish:** roadmap ordering, duplicate roadmap, per-roadmap accent colour, "last updated" control, nicer public page header, RSS/Atom feed of changes.
+- **Phase 3 — richer items:** status/dates/links, Shipped/changelog, PT/EN translations.
+- **Phase 4 — audience:** opt-in subscribe, votes, analytics (settle privacy and a database first).
+- **Phase 5 — teams:** shared roadmaps with roles, own-tenant installation.
+
+## 8. Start a new working session
 
 Open this repository in Claude Code and paste:
 
-> You're continuing the **Roadmaps** app (see `CLAUDE.md` and `docs/NOTES.md`). Version 0.1.0 exists locally with 13 passing tests and has not been deployed or committed to GitHub yet. First: (1) run `npm test`, `git status` and check what's already pushed; (2) help me deploy it on Railway — Volume at `/data`, the three variables, a custom domain — and walk me through each step; (3) then connect Taskboards (`ROADMAP_SRC`) and Diagramico (widget). I'll answer the open questions in section 5 as we go; for anything that changes the design, ask me one short question first. Reply in Portuguese, concisely, and don't commit or push until I say so.
+> You're continuing the **Roadmaps** app (see `CLAUDE.md` and `docs/NOTES.md`). Version 0.2 — Google sign-in, data in the user's Drive, public pages and an embed widget — exists with passing tests and has not been deployed yet. First run `npm test` and `git status`, and check what is on GitHub and on Railway. Then walk me through the Google + Railway setup in section 4 of the notes, one step at a time, and verify each step from the outside (`/healthz`, `/api/config`). I'll answer the open questions in section 6 as we go; for anything that changes the design ask me one short question first. Reply in Portuguese, concisely, and don't commit or push until I say so.
 
-## 8. Useful references
+## 9. References
 
-- Taskboards: `roadmap.html`, `roadmap.js`, `roadmap-embed.js`, `config.js` (`ROADMAP_SRC`), session-server pattern in `auth.js`, deployment notes in its `README.md`. The first version of the editor (localStorage + `roadmap.json` export) is in its git history at commit `bfe2402`.
-- Diagramico: `index.html` (`PLANS`, `ROAD`, waitlist form → Formspree), `docs/ROADMAP.md`.
-- Design reference: PrimeNG Aura (tokens are in `public/app.css`).
+- Taskboards: `auth.js` (the session server this one was adapted from), `app.js` (sync code `sync.js` was derived from), `share-core.js`/`view.js` (its encrypted sharing — a different design), `roadmap.*` and `roadmap-embed.js` (viewer and widget), `README.md`.
+- Diagramico: `index.html` (`PLANS`, `ROAD`, waitlist → Formspree), `docs/ROADMAP.md`.
+- Design reference: PrimeNG Aura (tokens in `public/app.css`).

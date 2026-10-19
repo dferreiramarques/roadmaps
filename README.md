@@ -1,95 +1,90 @@
 # Roadmaps
 
-Plan the roadmap of several products in one place, and show it on each product's own page.
+Plan a product roadmap in minutes, keep it private until you're ready, then share a page or embed it on your website.
+**Sign in with Google; your roadmaps live in your own Google Drive.** There is no database.
 
-- **Now / Next / Later** columns for every product, edited in a clean admin (Aura-style UI, light and dark).
-- **Public pages** — a directory (`/`) and one page per product (`/p/<id>`), read-only.
-- **Embeddable widget** — one `<div>` and one `<script>` put a product's roadmap on any website.
-- **History** — every change is a numbered revision you can restore; two tabs can't overwrite each other.
-- **No database, no build step** — Node + Express, vanilla JS, one JSON file per product on a disk.
+- **Now / Next / Later** columns for each of your products — drag, tag, edit (Aura-style UI, light and dark).
+- **Private by default.** Press **Share → Make public** to get a **public page** and an **embed snippet**. Make it private again and both stop working.
+- **Always a Roadmaps address.** The page is `https://<this site>/r/<id>` and the snippet loads `https://<this site>/embed.js`, so every share starts from here.
+- **Your data stays yours.** All your roadmaps are one file in the private app folder of *your* Drive; a public roadmap is a copy that exists only while it is shared.
 
 ```
-admin (you)  ──edit──▶  server  ──▶  /data/products/*.json (+ revisions)
-                          │
-visitors / other sites ◀──┴── /p/<id>  ·  /api/roadmap.json  ·  /embed.js
+you (browser) ──sign in──▶ /auth/*  (token exchange only, nothing stored)
+     │
+     ├── edit ──▶ your Google Drive (private app folder: roadmaps-data.json)
+     └── share ─▶ your Drive (one public "Roadmap — <name>" file per shared roadmap)
+
+visitors / other sites ──▶ /r/<id> · /embed.js · /api/public/<id> ──(read-only API key)──▶ the public file
 ```
+
+## How it works
+
+- **`/`** product page · **`/app`** the app (sign in with Google) · **`/r/<id>`** a public roadmap · **`/embed.js`** the widget.
+- **Sign-in** (`src/auth.js`): Google's authorization-code flow. The server keeps your refresh token in an encrypted `HttpOnly` cookie and exchanges it for short-lived access tokens, so you stay signed in for months without Google pop-ups. It stores nothing.
+- **Data** (`public/js/sync.js`): the browser reads and writes Drive directly. Local working copy + dirty flag + "ask before overwriting a newer version" + offline editing that reconciles later.
+- **Public reads** (`src/public.js`): visitors never talk to Google. `GET /api/public/<id>` fetches the public Drive file with a read-only API key, checks it really is a Roadmaps file, cleans it, caches it for 30 s and serves it with open CORS. (So a roadmap that is made private can still be served for up to ~30 s.)
+- **Embed** (`public/embed.js`): a shadow-root widget that only ever inserts text, follows the host page's theme, and works on pages with a strict CSP.
+
+## Embed on a website
+
+```html
+<div data-roadmap="THE-ID" data-header="true"></div>
+<script src="https://<this site>/embed.js" defer></script>
+```
+
+`THE-ID` is in the **Share** dialog (and in the page address). Optional: `data-header="true"` shows the name, tagline and link; `data-theme="light|dark"` forces a theme (default: follows `<html data-theme>` or the visitor's OS).
 
 ## Run it locally
 
 ```bash
 npm install
-cp .env.example .env      # then set ADMIN_TOKEN (see the file)
+cp .env.example .env       # fill in the values (see the file)
 node --env-file=.env server.js
-# → http://localhost:3000  (public)   http://localhost:3000/admin  (sign in with ADMIN_TOKEN)
+# → http://localhost:3000
 ```
 
-The first start with an empty `DATA_DIR` loads the example roadmaps from `seed/roadmap.json`. Load another file any time:
-`node scripts/seed.js path/to/roadmap.json` (products with the same `id` are replaced; the old versions stay in their history).
+## Set up Google (once)
+
+1. **Google Cloud Console → Credentials → OAuth client (Web application).** Add the redirect URI `https://<your site>/auth/callback` (and `http://localhost:3000/auth/callback` for local work). You can reuse the Taskboards project and client, or make a separate one — a separate client keeps the consent screen name and the private app folder apart.
+2. **Google Auth Platform → Data access:** the scopes `…/auth/drive.appdata` (your private data) and `…/auth/drive.file` (the public copy of a shared roadmap). Both are non-sensitive, so no Google review. Publishing status: **In production**.
+3. **Credentials → API key → Drive API only.** No HTTP-referrer restriction — it is used by the server.
 
 ## Deploy on Railway
 
-1. **New Project → Deploy from GitHub repo** (this repo). Railway detects Node; `railway.json` sets the start command and a health check on `/healthz`.
-2. **Add a Volume** to the service, mount path **`/data`**. Without it the data is wiped on every deploy.
-3. **Variables:**
-
-   | Variable | Value |
-   |---|---|
-   | `ADMIN_TOKEN` | a long random string — the password for `/admin` |
-   | `SESSION_SECRET` | another long random string (keeps you signed in across deploys) |
-   | `DATA_DIR` | `/data` |
-
-   Generate a secret with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
-4. **Settings → Networking → Custom Domain**, e.g. `roadmap.yourdomain.com`, and add the CNAME Railway shows at your DNS.
-5. Open `/admin`, sign in, done. Take backups from **Export** in the admin (a `roadmaps.json` you can re-import).
-
-## Show a roadmap on a product page
-
-```html
-<div data-roadmap="my-product" data-header="true"></div>
-<script src="https://roadmap.yourdomain.com/embed.js" defer></script>
-```
-
-`data-roadmap` is the product **id** (shown in the admin's address bar after you pick a product, and in `/p/<id>`).
-Optional: `data-header="true"` adds the product name, tagline and link; `data-theme="light|dark"` forces a theme (default: follows `<html data-theme>` or the visitor's OS); `data-src` reads a different dataset.
-The widget lives in a shadow root, so page CSS can't break it, and it only ever inserts text from the data, never HTML.
+1. **New Project → Deploy from GitHub repo.** Railway detects Node; `railway.json` sets the start command and a health check on `/healthz`.
+2. **Variables:** `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `COOKIE_SECRET`, `DRIVE_API_KEY` (see `.env.example`). `PUBLIC_URL` only if Google redirects to the wrong address. **No Volume is needed** — the server stores nothing.
+3. **Settings → Networking → Custom Domain** (e.g. `roadmap.yourdomain.com`), add the CNAME Railway shows, and add `https://<that domain>/auth/callback` to the OAuth client.
+4. Open `/app`, sign in, create a roadmap, **Share → Make public**, open the public page.
 
 ## API
 
-Public (CORS open, anyone can read):
-
 | | |
 |---|---|
-| `GET /api/roadmap.json` (also `/roadmap.json`) | every **public** product — what the widget reads |
-| `GET /api/products` | list with counts |
-| `GET /api/products/:id` | one product |
-
-Admin (signed in, same origin only): `POST /api/login` · `POST /api/logout` · `GET /api/me` · `POST /api/products` · `PUT /api/products/:id` (send the `rev` you loaded; a stale one gets `409`) · `DELETE /api/products/:id` · `GET /api/products/:id/revisions` · `POST /api/products/:id/restore` · `PUT /api/order` · `GET /api/export` · `POST /api/import`.
+| `GET /api/public/:id` | a shared roadmap — `{ id, name, tagline, url, now, next, later, updatedAt }` (CORS open, cached 30 s) |
+| `GET /api/config` | `{ signIn, publicRoadmaps }` — what this server has configured |
+| `GET /auth/login` · `/auth/callback` · `POST /auth/refresh` · `POST /auth/logout` | Google sign-in (same-origin; refresh/logout must come from this site) |
+| `GET /healthz` | health check |
 
 ## Data
 
-```
-DATA_DIR/products/<id>.json            current version of each product
-DATA_DIR/revisions/<id>/<rev>.json     every version (the latest 100 are kept)
-DATA_DIR/trash/<id>-<time>.json        deleted products
-DATA_DIR/index.json                    the order products are listed in
-```
-
-A product is `{ id, name, tagline, url, visibility: "public"|"private", now: [], next: [], later: [], rev, createdAt, updatedAt }`;
-an item is `{ id, title, description, tag, tone }` with `tone` one of `success info warn danger secondary contrast`.
-Everything written is trimmed, length-capped and checked on the way in (`src/schema.js`).
+- **Private:** `roadmaps-data.json` in your Drive's private app folder — `{ app: "roadmaps", version: 1, current, roadmaps: [{ id, name, tagline, url, now, next, later, share?: { fileId } }] }`.
+- **Public copy:** a Drive file `Roadmap — <name>` readable by anyone with the link — `{ app: "roadmaps-public", name, tagline, url, now, next, later }`. Item ids and everything else about your account are left out.
+- An item is `{ title, description, tag, tone }`, `tone` one of `success info warn danger secondary contrast`.
+- **Backup:** *user menu → Export backup* downloads everything; *Import* restores it (it also accepts the older `{ products: [...] }` roadmap.json shape).
 
 ## Security, briefly
 
-- Editing needs the admin token; the session is a signed `HttpOnly` cookie. Every state-changing request must come from the same origin and be JSON.
-- The roadmap data is **public by design** — private products are never sent to visitors, but don't put secrets in anything marked public.
-- A strict Content-Security-Policy is set on every page (no inline scripts).
+- Strict Content-Security-Policy on every page (no inline scripts or styles). All user text is rendered as text.
+- Sign-in cookies are `HttpOnly`, `SameSite=Lax`, AES-GCM encrypted; state-changing calls must come from the same origin.
+- `/api/public/:id` only reaches the Drive *files* API for a well-formed id, only serves files that are Roadmaps files, and is rate limited.
+- A public roadmap is public: anyone with the link can read it. Don't put secrets in it.
 
 ## Tests
 
 ```bash
-npm test      # API, auth, validation, revisions, import/export, seeding (13 tests)
+npm test      # schema cleaning, public proxy, Google sign-in (against a fake Google), pages and headers
 ```
 
 ## More
 
-`docs/NOTES.md` has the product notes: decisions so far, open questions, the plan, and a prompt to start a new working session.
+`docs/NOTES.md` has the product notes: decisions, what exists, open questions, the plan, and a prompt to start a new working session.
