@@ -475,13 +475,13 @@
       const cur = r.shipped.map(x => entry(x,
         () => { r.shipped = r.shipped.filter(y => y.id !== x.id); const { shippedAt, ...back } = x; r.now.unshift(back); touch(); render(); },
         () => { r.shipped = r.shipped.filter(y => y.id !== x.id); touch(); render(); }));
-      d.body.append(
+      d.body.append(...[
         el('p', { class: 'dialog__msg' }, `Version ${r.version || '1.0.0'}${r.shipped.length ? '' : ' — nothing shipped yet'}`),
         cur.length ? el('div', { class: 'ships' }, cur) : el('p', { class: 'dialog__msg dim' }, 'Use the flag on a card to mark a feature as shipped. Shipped features are public by default.'),
         r.releases.length > 0 && el('p', { class: 'dialog__msg ship__h' }, 'Previous versions'),
         r.releases.length > 0 && el('div', { class: 'ships' }, r.releases.map(v => el('div', { class: 'ship' },
           el('div', { class: 'ship__main' }, el('strong', {}, `Version ${v.version}`), el('span', { class: 'ship__desc' }, `${v.items.length} shipped · closed ${fmtDate(v.closedAt)}`)),
-          r.share && el('a', { class: 'btn btn--text btn--sm', href: changelogUrl(r, v.version), target: '_blank', rel: 'noopener' }, `${v.version}.md`)))));
+          r.share && el('a', { class: 'btn btn--text btn--sm', href: changelogUrl(r, v.version), target: '_blank', rel: 'noopener' }, `${v.version}.md`))))].filter(Boolean));   // append() would print a false as text
       d.foot.append(
         el('button', { class: 'btn btn--text', onclick: () => d.close() }, 'Close'),
         el('button', { class: 'btn btn--primary', onclick: () => { d.close(); versionDialog(); } }, 'New version…'));
