@@ -498,6 +498,13 @@
       el('button', { class: 'rtab rtab--add', title: 'New roadmap', 'aria-label': 'New roadmap', html: icon('plus'), onclick: () => roadmapDialog(null) })
     ]);
     box.hidden = false;
+    // keep the open roadmap's tab visible when the row scrolls sideways (phones)
+    const active = box.querySelector('.rtab[aria-pressed="true"]');
+    if (active && !(tabDrag && tabDrag.active)) {
+      const b = box.getBoundingClientRect(), t = active.getBoundingClientRect();
+      if (t.left < b.left) box.scrollLeft -= b.left - t.left + 8;
+      else if (t.right > b.right) box.scrollLeft += t.right - b.right + 8;
+    }
   }
 
   // ── tab colour menu ─────────────────────────────────────────────────────────────────
@@ -722,13 +729,16 @@
   }
 
   // ── user menu, sync status, theme ───────────────────────────────────────────────────
+  // one menu, two buttons: the avatar on wide screens, the ⋮ button on phones (where everything but the tabs lives in it)
   const menu = $('#user-menu');
-  $('#user-btn').addEventListener('click', e => { e.stopPropagation(); menu.hidden = !menu.hidden; $('#user-btn').setAttribute('aria-expanded', String(!menu.hidden)); });
-  document.addEventListener('click', e => { if (!e.target.closest('#user')) { menu.hidden = true; } });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') menu.hidden = true; });
+  const menuBtns = [$('#user-btn'), $('#more-btn')];
+  const setMenu = open => { menu.hidden = !open; menuBtns.forEach(b => b.setAttribute('aria-expanded', String(open))); };
+  menuBtns.forEach(b => b.addEventListener('click', e => { e.stopPropagation(); setMenu(menu.hidden); }));
+  document.addEventListener('click', e => { if (!e.target.closest('#user')) setMenu(false); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') setMenu(false); });
 
   $('#btn-signout').addEventListener('click', async () => {
-    menu.hidden = true;
+    setMenu(false);
     if (await RMSync.signOut()) { roadmaps = []; current = ''; showGate('You are signed out.'); }
   });
 
@@ -737,18 +747,22 @@
     s.hidden = false;
     s.className = 'chip ' + (state === 'synced' ? 'chip--ok' : state === 'syncing' ? 'chip--info' : state === 'error' ? 'chip--danger' : 'chip--muted');
     s.textContent = label;
+    const m = $('#sync-m');
+    m.className = s.className;
+    m.textContent = label;
+    $('#more-btn').dataset.sync = state;   // a dot on the ⋮ button when something needs attention
   }
 
   // ── backup ──────────────────────────────────────────────────────────────────────────
   $('#btn-export').addEventListener('click', () => {
-    menu.hidden = true;
+    setMenu(false);
     const url = URL.createObjectURL(new Blob([JSON.stringify({ app: 'roadmaps', version: 1, current, roadmaps }, null, 2) + '\n'], { type: 'application/json' }));
     const a = el('a', { href: url, download: `roadmaps-backup-${new Date().toISOString().slice(0, 10)}.json` });
     document.body.append(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     toast('Backup downloaded');
   });
-  $('#btn-import').addEventListener('click', () => { menu.hidden = true; $('#file').click(); });
+  $('#btn-import').addEventListener('click', () => { setMenu(false); $('#file').click(); });
   $('#file').addEventListener('change', async e => {
     const f = e.target.files[0];
     e.target.value = '';

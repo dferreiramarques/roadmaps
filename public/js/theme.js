@@ -11,18 +11,21 @@
   var MOON = '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>';
   var svg = function (p) { return '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + p + '</svg>'; };
 
-  function apply(t, btn) {
+  // every [data-theme-toggle] button toggles the theme; its icon (the button itself, or a .theme-ico inside it) follows the theme
+  function apply(t, btns) {
     document.documentElement.setAttribute('data-theme', t);
     try { localStorage.setItem(KEY, t); } catch (e) {}
-    if (btn) btn.innerHTML = svg(t === 'dark' ? SUN : MOON);
+    btns.forEach(function (b) { (b.querySelector('.theme-ico') || b).innerHTML = svg(t === 'dark' ? SUN : MOON); });
   }
 
   document.addEventListener('DOMContentLoaded', function () {
-    var btn = document.getElementById('btn-theme');
-    if (!btn) return;
-    apply(document.documentElement.getAttribute('data-theme'), btn);
-    btn.addEventListener('click', function () {
-      apply(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark', btn);
+    var btns = Array.prototype.slice.call(document.querySelectorAll('[data-theme-toggle]'));
+    if (!btns.length) return;
+    apply(document.documentElement.getAttribute('data-theme'), btns);
+    btns.forEach(function (b) {
+      b.addEventListener('click', function () {
+        apply(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark', btns);
+      });
     });
   });
 })();

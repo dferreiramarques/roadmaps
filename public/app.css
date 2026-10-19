@@ -399,6 +399,28 @@ a.btn { text-decoration: none; }
 .user__item { display: block; width: 100%; text-align: left; padding: 8px 10px; border: 0; border-radius: var(--r-sm); background: none; font-size: .875rem; }
 .user__item:hover { background: var(--surface-2); }
 .user__sep { height: 1px; background: var(--border); margin: 6px 4px; }
+a.user__item { color: inherit; text-decoration: none; }
+.user__item--m, .user__sep--m { display: none; }
+.user__row { align-items: center; justify-content: space-between; gap: 12px; }
+.user__row .ico { width: 16px; height: 16px; }
+.theme-ico { display: inline-flex; }
+.more-btn { display: none; position: relative; }
+.more-btn[data-sync="error"]::after { content: ""; position: absolute; top: 5px; right: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--danger); }
+
+/* phones: the top bar keeps only the roadmap tabs and a ⋮ menu — brand, sync status, theme and account move into the menu */
+@media (max-width: 700px) {
+  .topbar__in { flex-wrap: nowrap; gap: 8px; }
+  .topbar:has(#user:not([hidden])) .brand,
+  .topbar:has(#user:not([hidden])) .grow,
+  .topbar:has(#user:not([hidden])) #sync,
+  .topbar:has(#user:not([hidden])) #btn-theme { display: none; }
+  .topbar #roadmaps { flex: 1 1 0; min-width: 0; }
+  .user__btn { display: none; }
+  .more-btn { display: inline-flex; }
+  .user__item--m { display: flex; }
+  .user__sep--m { display: block; }
+  .user__menu { min-width: 240px; }
+}
 
 /* roadmap tabs — the Taskboards colour system: each tab has its own colour (automatic, or picked with a right-click) */
 .rtabs { display: flex; align-items: center; gap: 6px; max-width: 100%; overflow-x: auto; scrollbar-width: none; padding: 2px; }

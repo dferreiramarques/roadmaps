@@ -26,15 +26,22 @@
       <span class="grow"></span>
 
       <span class="chip chip--muted" id="sync" hidden>Offline</span>
-      <button class="btn btn--text btn--icon" id="btn-theme" aria-label="Toggle light / dark theme" title="Toggle theme"></button>
+      <button class="btn btn--text btn--icon" id="btn-theme" data-theme-toggle aria-label="Toggle light / dark theme" title="Toggle theme"></button>
 
       <div class="user" id="user" hidden>
         <button class="user__btn" id="user-btn" aria-haspopup="true" aria-expanded="false">
           <img class="user__avatar" id="user-avatar" alt="" referrerpolicy="no-referrer" />
           <span class="user__name" id="user-name"></span>
         </button>
+        <button class="btn btn--text btn--icon more-btn" id="more-btn" aria-haspopup="true" aria-expanded="false" aria-label="Menu" title="Menu">
+          <svg class="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+        </button>
         <div class="user__menu" id="user-menu" hidden>
           <div class="user__email" id="user-email"></div>
+          <a class="user__item user__item--m" href="/">About Roadmaps</a>
+          <div class="user__item user__item--m user__row"><span>Sync</span><span class="chip chip--muted" id="sync-m">Offline</span></div>
+          <button class="user__item user__item--m user__row" id="btn-theme-m" data-theme-toggle><span>Light / dark theme</span><span class="theme-ico"></span></button>
+          <div class="user__sep user__sep--m"></div>
           <button class="user__item" id="btn-export">Export backup (.json)</button>
           <button class="user__item" id="btn-import">Import backup…</button>
           <div class="user__sep"></div>

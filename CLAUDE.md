@@ -6,7 +6,7 @@ Instructions for Claude Code when working in this repository. Read `docs/NOTES.m
 A small hosted app (Node + Express, vanilla JS, **no build step**) where anyone can sign in with Google and keep **Now / Next / Later roadmaps for their products**.
 Each roadmap starts private; the owner can make it public, which gives a **public page** and an **embed snippet** that always point back to this site.
 **The server stores nothing**: the user's roadmaps are a file in their own Google Drive (private app folder); a shared roadmap is a public copy in their Drive that the server reads for visitors.
-Hosted on **Railway** (no Volume needed). The owner is David (talks in Portuguese; the UI and code are in English).
+Hosted on **Railway** at https://roadmaps.monco.io (no Volume needed; own Google Cloud project). The owner is David (talks in Portuguese; the UI and code are in English).
 
 ## Commands
 ```bash
@@ -27,12 +27,13 @@ node --env-file=.env server.js    # run locally (see .env.example)
 4. **The server must stay stateless and secret-light.** No database, no files for user data, no tokens stored. The only secrets are env vars (`GOOGLE_CLIENT_SECRET`, `COOKIE_SECRET`, `DRIVE_API_KEY`).
 5. **`/api/public/:id` is the only way visitors read a roadmap.** It must only accept well-formed ids, only talk to the Drive *files* API, only serve files marked `app: "roadmaps-public"`, and stay cached/rate-limited. Add a test when changing it.
 6. **Drive sync safety (see `sync.js`):** never save after a failed/ambiguous load; ask before overwriting a newer Drive copy; edits made offline are flagged and reconciled later; a different Google account must never inherit another account's local data; deleting or importing over a shared roadmap must revoke its public copy (queued if offline).
-7. Keep it dependency-light (Express only). Ask before adding a dependency or a database.
+7. **Phones (≤ 700 px): the top bar shows only the roadmap tabs and a ⋮ button.** Everything else (brand link, sync chip, theme toggle, export/import, sign-out) lives in `#user-menu`; mobile-only items use `.user__item--m`. New top-bar controls must be added to that menu too. Theme buttons carry `data-theme-toggle` (`theme.js` wires all of them).
+8. Keep it dependency-light (Express only). Ask before adding a dependency or a database.
 
 ## Working style
 - Reply to David in Portuguese, concisely: lead with the result, then only what he needs to act on.
 - **Commit and push only when asked.** Check `git status` first; this repo is edited on Windows (CRLF warnings from git are normal). Railway deploys on every push to `main`, so set env vars first.
-- Verify UI changes in a real browser (the preview pane), not just by reading code. Quirks learned: the pane freezes CSS transitions/animations while hidden — inject `*{transition:none!important;animation:none!important}` before measuring or taking screenshots; set the viewport with `resize_window` and reset it afterwards; clean `localStorage`/test data when done. A full sign-in + Drive loop can be tested with a fake Google (token/auth endpoints) and a fake Drive server — see how `test/server.test.js` fakes Google.
+- Verify UI changes in a real browser (the preview pane), not just by reading code. Quirks learned: the pane freezes CSS transitions/animations while hidden — inject `*{transition:none!important;animation:none!important}` before measuring or taking screenshots; set the viewport with `resize_window` and reset it afterwards; clean `localStorage`/test data when done. A full sign-in + Drive loop can be tested with a fake Google (token/auth endpoints: `GOOGLE_AUTH_URL`, `GOOGLE_TOKEN_URL`, `GOOGLE_REVOKE_URL` env vars) and a fake Drive server — see how `test/server.test.js` fakes Google. For the browser, serve a copy of `public/` whose `app.html` loads a small script before `sync.js` that rewrites `https://www.googleapis.com/` fetches to the fake Drive (and add that origin to `connect-src` in the copy of `server.js`).
 - Edit files with the Edit tool or small scripts; regex escapes (`\d`) get lost when pasted through shell heredocs.
 - When a request is ambiguous and the answer changes the design, ask one short question; otherwise pick the sensible default and say what you chose.
 - Don't paste secrets anywhere — they are set in Railway's Variables.
