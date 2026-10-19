@@ -258,7 +258,7 @@ test('sharing: creates a link-readable copy with only public fields; refuses wit
   assert.deepEqual(t.drive.perms, [{ id: share.fileId, role: 'reader', type: 'anyone', allowFileDiscovery: false }]);
   const pub = t.drive.content(share.fileId);
   assert.equal(pub.app, 'roadmaps-public');
-  assert.deepEqual(Object.keys(pub.now[0]).sort(), ['description', 'tag', 'title', 'tone']);
+  assert.deepEqual(Object.keys(pub.now[0]).sort(), ['description', 'tag', 'title', 'tone', 'when']);
   assert.equal(JSON.stringify(pub).includes('secret-id'), false);
   assert.equal(r.share.fileId, share.fileId);
 
@@ -322,4 +322,27 @@ test('sign-out saves first, wipes this device, and refuses to drop unsynced work
   await stuck.edit(s => s.roadmaps[0].name = 'Three');
   assert.equal(await stuck.sync.signOut(), false, 'confirm() said no');
   assert.ok(stuck.store.get('roadmaps-data'), 'local copy kept');
+});
+
+test('sharing: the public copy carries the language, the dates, the shipped changelog and the last 20 versions — without ids', async () => {
+  const t = boot();
+  await t.sync.start();
+  const entry = n => ({ id: 'secret' + n, title: 'Shipped ' + n, description: 'd', tag: '', tone: 'secondary', when: '', shippedAt: 1760000000000 + n });
+  const r = rm('a', 'Taskboards', {
+    lang: 'pt', version: '1.4.0',
+    now: [{ id: 'i1', title: 'Soon', when: 'Q1 2027' }],
+    shipped: [entry(1)],
+    releases: Array.from({ length: 25 }, (_, i) => ({ version: `1.${25 - i}.0`, closedAt: 1750000000000 + i, items: [entry(100 + i)] }))
+  });
+  t.state.roadmaps.push(r);
+  const { fileId } = await t.sync.share.create(r);
+  const pub = t.drive.content(fileId);
+  assert.equal(pub.lang, 'pt');
+  assert.equal(pub.version, '1.4.0');
+  assert.equal(pub.now[0].when, 'Q1 2027');
+  assert.equal(pub.shipped[0].title, 'Shipped 1');
+  assert.equal(pub.shipped[0].shippedAt, 1760000000001);
+  assert.equal(pub.releases.length, 20, 'only the last 20 closed versions are public');
+  assert.equal(pub.releases[0].version, '1.25.0');
+  assert.equal(JSON.stringify(pub).includes('secret'), false, 'no ids reach the public file');
 });

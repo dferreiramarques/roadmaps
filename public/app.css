@@ -493,6 +493,33 @@ body.tab-dragging, body.tab-dragging * { cursor: grabbing !important; }
 .share__error { color: var(--danger); font-size: .875rem; }
 .share__note { color: var(--warn); font-size: .875rem; }
 
+/* shipped changelog, feature dates */
+.card__when { display: inline-flex; align-items: center; gap: 4px; font-size: .75rem; color: var(--subtle); white-space: nowrap; }
+.card__when .ico { width: 12px; height: 12px; }
+.ships { display: flex; flex-direction: column; gap: 8px; }
+.ship { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); }
+.ship__main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ship__desc { color: var(--muted); font-size: .8125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ship__date { color: var(--subtle); font-size: .8125rem; white-space: nowrap; }
+.ship__h { margin-top: 8px; font-weight: 600; }
+
+/* public page /r/<id> */
+.rm-page { padding-bottom: 48px; }
+.rm-page .cols { padding-bottom: 20px; }
+.pubfoot { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; color: var(--subtle); font-size: .8125rem; }
+.pubfoot .btn .ico { width: 15px; height: 15px; color: var(--primary-h); }
+[data-theme="dark"] .pubfoot .btn .ico { color: var(--primary); }
+.pubfoot__link { color: var(--primary-h); text-decoration: none; font-weight: 500; }
+[data-theme="dark"] .pubfoot__link { color: var(--primary); }
+.pubfoot__link:hover { text-decoration: underline; }
+.shippedbox { margin-top: 18px; padding: 18px 20px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-xl); }
+.shippedbox__title { font-size: 1.0625rem; letter-spacing: -.01em; margin-bottom: 12px; }
+.shippedbox__title small { color: var(--subtle); font-weight: 400; font-size: .8125rem; }
+.shippedbox__prev { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); color: var(--subtle); font-size: .875rem; }
+.shippedbox__prev a { color: var(--primary-h); text-decoration: none; font-weight: 500; }
+[data-theme="dark"] .shippedbox__prev a { color: var(--primary); }
+.ship__desc--wrap { white-space: normal; }
+
 /* ── product page (landing) ─────────────────────────────────────────────── */
 .nav { display: flex; gap: 4px; margin-left: 8px; }
 .nav a { padding: 6px 10px; border-radius: var(--r-sm); color: var(--muted); text-decoration: none; font-size: .875rem; font-weight: 500; }

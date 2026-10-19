@@ -8,6 +8,20 @@
     { id: 'later', label: 'Later', sub: 'On the horizon' }
   ];
   const TONES = ['success', 'info', 'warn', 'danger', 'secondary', 'contrast'];
+  // The language a roadmap is written in. The public page declares it and offers a translate link to visitors who read another one.
+  const LANGS = [['en', 'English'], ['pt', 'Português'], ['es', 'Español'], ['fr', 'Français'], ['de', 'Deutsch'], ['it', 'Italiano'], ['nl', 'Nederlands']];
+  const defaultLang = () => { const l = (navigator.language || 'en').slice(0, 2).toLowerCase(); return LANGS.some(x => x[0] === l) ? l : 'en'; };
+  const VERSION_RE = /^[0-9A-Za-z][0-9A-Za-z.-]{0,19}$/;
+  const SEMVER = /^(\d+)\.(\d+)\.(\d+)$/;
+  const bump = (v, kind) => {
+    const m = SEMVER.exec(v || '');
+    if (!m) return '';
+    let [a, b, c] = m.slice(1).map(Number);
+    if (kind === 'major') { a++; b = 0; c = 0; } else if (kind === 'minor') { b++; c = 0; } else c++;
+    return `${a}.${b}.${c}`;
+  };
+  const fmtDate = ms => new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  const isoDay = ms => { const d = new Date(ms); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
   const TONE_LABEL = { success: 'Success', info: 'Info', warn: 'Warning', danger: 'Danger', secondary: 'Neutral', contrast: 'Contrast' };
 
   const $ = s => document.querySelector(s);
@@ -44,6 +58,8 @@
     lock:   '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
     rocket: '<path d="M12 2c3 2.5 4.5 6 4.5 9.5V16l2 3h-4L12 22l-2.5-3h-4l2-3v-4.5C7.5 8 9 4.5 12 2z"/><circle cx="12" cy="10" r="1.6"/>',
     copy:   '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
+    flag:   '<path d="M4 22V4"/><path d="M4 4h13l-2 4 2 4H4"/>',
+    calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/>',
     share:  '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/>'
   };
   const icon = name => `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON_PATHS[name]}</svg>`;
@@ -63,22 +79,31 @@
   let current = '';
   const roadmap = () => roadmaps.find(r => r.id === current) || roadmaps[0];
 
+  function normalizeItem(it, seen) {
+    const title = str(it && it.title, 80);
+    if (!title) return null;
+    let id = str(it.id, 24).replace(/[^\w-]/g, '') || uid();
+    while (seen.has(id)) id = uid();
+    seen.add(id);
+    return { id, title, description: str(it.description, 280), tag: str(it.tag, 20), tone: TONES.includes(it.tone) ? it.tone : 'secondary', when: str(it.when, 12) };
+  }
+  const normalizeShipped = (list, seen) => (Array.isArray(list) ? list : []).slice(0, 100).map(it => {
+    const n = normalizeItem(it, seen);
+    return n && { ...n, shippedAt: Math.floor(Number(it.shippedAt)) > 0 ? Math.floor(Number(it.shippedAt)) : Date.now() };
+  }).filter(Boolean);
+
   function normalizeRoadmap(raw) {
     if (!raw || typeof raw !== 'object') return null;
     const name = str(raw.name, 40);
     if (!name) return null;
     const seen = new Set();
     const r = { id: str(raw.id, 24).replace(/[^\w-]/g, '') || uid(), name, tagline: str(raw.tagline, 140), url: cleanUrl(raw.url) };
-    for (const c of COLS) {
-      r[c.id] = (Array.isArray(raw[c.id]) ? raw[c.id] : []).slice(0, 100).map(it => {
-        const title = str(it && it.title, 80);
-        if (!title) return null;
-        let id = str(it.id, 24).replace(/[^\w-]/g, '') || uid();
-        while (seen.has(id)) id = uid();
-        seen.add(id);
-        return { id, title, description: str(it.description, 280), tag: str(it.tag, 20), tone: TONES.includes(it.tone) ? it.tone : 'secondary' };
-      }).filter(Boolean);
-    }
+    for (const c of COLS) r[c.id] = (Array.isArray(raw[c.id]) ? raw[c.id] : []).slice(0, 100).map(it => normalizeItem(it, seen)).filter(Boolean);
+    r.lang = LANGS.some(x => x[0] === raw.lang) ? raw.lang : 'en';
+    if (VERSION_RE.test(raw.version || '')) r.version = raw.version;
+    r.shipped = normalizeShipped(raw.shipped, seen);
+    r.releases = (Array.isArray(raw.releases) ? raw.releases : []).slice(0, 50)
+      .map(v => (v && VERSION_RE.test(v.version || '') ? { version: v.version, closedAt: Math.floor(Number(v.closedAt)) > 0 ? Math.floor(Number(v.closedAt)) : Date.now(), items: normalizeShipped(v.items, seen) } : null)).filter(Boolean);
     if (HEX_COLOR.test(raw.color)) r.color = raw.color;
     if (Number(raw.updatedAt) > 0) r.updatedAt = Math.floor(Number(raw.updatedAt));
     if (raw.share && /^[A-Za-z0-9_-]{10,100}$/.test(raw.share.fileId || '')) r.share = { fileId: raw.share.fileId, createdAt: Number(raw.share.createdAt) || Date.now() };
@@ -87,7 +112,7 @@
 
   // "Updated <date>": a roadmap's updatedAt moves only when what visitors would see changes (name, tagline, website, features),
   // not when tabs are reordered, recoloured or shared. Content is compared against what was last loaded or saved.
-  const contentKey = r => JSON.stringify([r.name, r.tagline, r.url, r.now, r.next, r.later]);
+  const contentKey = r => JSON.stringify([r.name, r.tagline, r.url, r.lang, r.version, r.now, r.next, r.later, r.shipped, r.releases]);
   const seenContent = new Map();
   function rememberContent() { seenContent.clear(); roadmaps.forEach(r => seenContent.set(r.id, contentKey(r))); }
   function stampChanges() {
@@ -221,15 +246,16 @@
     const name = el('input', { class: 'input', maxlength: 40, placeholder: 'Product name', value: r?.name || '' });
     const tagline = el('input', { class: 'input', maxlength: 140, placeholder: 'One line about the product', value: r?.tagline || '' });
     const url = el('input', { class: 'input', maxlength: 200, placeholder: 'https://', value: r?.url || '', inputmode: 'url' });
+    const lang = el('select', { class: 'input' }, LANGS.map(([code, label]) => el('option', { value: code, selected: code === (r?.lang || defaultLang()) }, label)));
 
     const save = () => {
       if (!str(name.value, 40)) { name.setAttribute('aria-invalid', 'true'); name.focus(); return; }
       if (isNew) {
-        const nr = { id: uid(), name: str(name.value, 40), tagline: str(tagline.value, 140), url: cleanUrl(url.value), now: [], next: [], later: [] };   // private until shared
+        const nr = { id: uid(), name: str(name.value, 40), tagline: str(tagline.value, 140), url: cleanUrl(url.value), lang: lang.value, now: [], next: [], later: [], shipped: [], releases: [] };   // private until shared
         roadmaps.push(nr);
         current = nr.id;
       } else {
-        Object.assign(r, { name: str(name.value, 40), tagline: str(tagline.value, 140), url: cleanUrl(url.value) });
+        Object.assign(r, { name: str(name.value, 40), tagline: str(tagline.value, 140), url: cleanUrl(url.value), lang: lang.value });
       }
       d.close();
       touch();
@@ -239,8 +265,8 @@
       const base = r.name.replace(/\s*\(copy(?: \d+)?\)$/, '').slice(0, 31).trim();   // a copy of a copy is “(copy 2)”, not “(copy) (copy)”
       let name = `${base} (copy)`;
       for (let n = 2; names.has(name); n++) name = `${base} (copy ${n})`;
-      const { share, updatedAt, id, ...rest } = JSON.parse(JSON.stringify(r));     // a copy starts private, with new ids
-      const copy = normalizeRoadmap({ ...rest, id: '', name, now: rest.now.map(i => ({ ...i, id: '' })), next: rest.next.map(i => ({ ...i, id: '' })), later: rest.later.map(i => ({ ...i, id: '' })) });
+      const { share, updatedAt, id, shipped, releases, version, ...rest } = JSON.parse(JSON.stringify(r));     // a copy starts private, with new ids and an empty changelog
+      const copy = normalizeRoadmap({ ...rest, id: '', name, now: rest.now.map(i => ({ ...i, id: '' })), next: rest.next.map(i => ({ ...i, id: '' })), later: rest.later.map(i => ({ ...i, id: '' })), shipped: [], releases: [] });
       roadmaps.splice(roadmaps.findIndex(x => x.id === r.id) + 1, 0, copy);
       current = copy.id;
       d.close();
@@ -264,7 +290,7 @@
     ];
     const d = openDialog({
       title: isNew ? 'New roadmap' : 'Edit roadmap',
-      body: [field('Name', name), field('Tagline', tagline), field('Website', url, 'Shown as a link under the title.')],
+      body: [field('Name', name), field('Tagline', tagline), field('Website', url, 'Shown as a link under the title.'), field('Language', lang, 'The language you write it in. Visitors who read another one get a Translate link.')],
       foot
     });
     [name, tagline, url].forEach(i => i.addEventListener('keydown', e => { if (e.key === 'Enter') save(); }));
@@ -359,6 +385,7 @@
     const title = el('input', { class: 'input', maxlength: 80, placeholder: 'Feature name', value: item?.title || '' });
     const desc = el('textarea', { class: 'textarea', maxlength: 280, placeholder: 'What it is and why it matters (optional)' }, item?.description || '');
     const tag = el('input', { class: 'input', maxlength: 20, placeholder: 'e.g. Free, Teams, Beta', value: item?.tag || '' });
+    const when = el('input', { class: 'input', maxlength: 12, placeholder: 'e.g. Q1 2027', value: item?.when || '' });
 
     const tones = el('div', { class: 'tones', role: 'group', 'aria-label': 'Tag colour' });
     const paintTones = () => [...tones.children].forEach((b, i) => b.setAttribute('aria-pressed', String(TONES[i] === draft.tone)));
@@ -378,7 +405,7 @@
     const save = () => {
       const t = str(title.value, 80);
       if (!t) { title.setAttribute('aria-invalid', 'true'); title.focus(); return; }
-      const fields = { title: t, description: str(desc.value, 280), tag: str(tag.value, 20), tone: draft.tone };
+      const fields = { title: t, description: str(desc.value, 280), tag: str(tag.value, 20), tone: draft.tone, when: str(when.value, 12) };
       const r = roadmap();
       if (isNew) r[draft.col].push({ id: uid(), ...fields });
       else if (draft.col === colId) Object.assign(item, fields);
@@ -396,12 +423,103 @@
       body: [
         field('Title', title), field('Description', desc),
         el('div', { class: 'row2' }, field('Tag', tag, 'A short label on the card.'), el('div', { class: 'field' }, el('span', { class: 'lbl' }, 'Column'), colSeg)),
+        field('When (optional)', when, 'A rough timing, not a promise: “Q1 2027”, “Dec”.'),
         pick && el('div', { class: 'field' }, el('span', { class: 'lbl' }, 'Labels already in this roadmap'), pick),
         el('div', { class: 'field' }, el('span', { class: 'lbl' }, 'Tag colour'), tones)
       ],
       foot
     });
     title.addEventListener('keydown', e => { if (e.key === 'Enter') save(); });
+  }
+
+  // ── shipped and versions ────────────────────────────────────────────────────────────
+  // Mark shipped: the feature leaves the columns and joins the current version of the changelog.
+  function shipDialog(item) {
+    const r = roadmap();
+    const day = el('input', { class: 'input', type: 'date', value: isoDay(Date.now()), max: isoDay(Date.now() + 86400000) });
+    const version = r.version || '1.0.0';
+    const save = () => {
+      const when = day.value ? new Date(day.value + 'T12:00:00').getTime() : Date.now();
+      const col = colOf(item.id);
+      if (!col) { d.close(); return; }
+      r[col] = r[col].filter(x => x.id !== item.id);
+      r.shipped.unshift({ ...item, shippedAt: when });
+      r.shipped.sort((a, b) => b.shippedAt - a.shippedAt);
+      if (!r.version) r.version = '1.0.0';
+      d.close();
+      touch();
+      toast(`“${item.title}” shipped in ${r.version}`);
+    };
+    const d = openDialog({
+      title: 'Mark as shipped',
+      body: [el('p', { class: 'dialog__msg' }, `“${item.title}” leaves the columns and goes to the changelog of version ${version}.`), field('Shipped on', day)],
+      foot: [el('button', { class: 'btn btn--text', onclick: () => d.close() }, 'Cancel'), el('button', { class: 'btn btn--primary', onclick: save }, 'Mark shipped')]
+    });
+    day.addEventListener('keydown', e => { if (e.key === 'Enter') save(); });
+  }
+
+  const changelogUrl = (r, version) => `${location.origin}/r/${r.share.fileId}/changelog${version ? '/' + encodeURIComponent(version) : ''}.md`;
+
+  function shippedDialog() {
+    const r = roadmap();
+    const d = openDialog({ title: 'Shipped', body: [], foot: [], wide: true });
+    const entry = (x, onBack, onDelete) => el('div', { class: 'ship' },
+      el('div', { class: 'ship__main' }, el('strong', {}, x.title), x.description && el('span', { class: 'ship__desc' }, x.description)),
+      el('span', { class: 'ship__date' }, fmtDate(x.shippedAt)),
+      onBack && el('button', { class: 'btn btn--text btn--sm', title: 'Move back to Now', onclick: onBack }, 'Back to Now'),
+      onDelete && el('button', { class: 'btn btn--text btn--icon btn--sm btn--del', title: 'Remove from the changelog', 'aria-label': 'Remove from the changelog', html: icon('trash'), onclick: onDelete }));
+
+    function render() {
+      d.body.replaceChildren();
+      d.foot.replaceChildren();
+      const cur = r.shipped.map(x => entry(x,
+        () => { r.shipped = r.shipped.filter(y => y.id !== x.id); const { shippedAt, ...back } = x; r.now.unshift(back); touch(); render(); },
+        () => { r.shipped = r.shipped.filter(y => y.id !== x.id); touch(); render(); }));
+      d.body.append(...[
+        el('p', { class: 'dialog__msg' }, `Version ${r.version || '1.0.0'}${r.shipped.length ? '' : ' — nothing shipped yet'}`),
+        cur.length ? el('div', { class: 'ships' }, cur) : el('p', { class: 'dialog__msg dim' }, 'Use the flag on a card to mark a feature as shipped. Shipped features are public by default.'),
+        r.releases.length > 0 && el('p', { class: 'dialog__msg ship__h' }, 'Previous versions'),
+        r.releases.length > 0 && el('div', { class: 'ships' }, r.releases.map(v => el('div', { class: 'ship' },
+          el('div', { class: 'ship__main' }, el('strong', {}, `Version ${v.version}`), el('span', { class: 'ship__desc' }, `${v.items.length} shipped · closed ${fmtDate(v.closedAt)}`)),
+          r.share && el('a', { class: 'btn btn--text btn--sm', href: changelogUrl(r, v.version), target: '_blank', rel: 'noopener' }, `${v.version}.md`))))].filter(Boolean));   // append() would print a false as text
+      d.foot.append(
+        el('button', { class: 'btn btn--text', onclick: () => d.close() }, 'Close'),
+        el('button', { class: 'btn btn--primary', onclick: () => { d.close(); versionDialog(); } }, 'New version…'));
+    }
+    render();
+  }
+
+  function versionDialog() {
+    const r = roadmap();
+    const current = r.version || '1.0.0';
+    if (!r.shipped.length) { toast('Nothing has shipped in this version yet', 'warn'); return; }
+    const draft = { kind: SEMVER.test(current) ? 'minor' : '' };
+    const label = el('input', { class: 'input mono', maxlength: 20, value: draft.kind ? bump(current, draft.kind) : '' });
+    const kinds = ['patch', 'minor', 'major'].map(k => ({ id: k, label: `${k[0].toUpperCase()}${k.slice(1)}${SEMVER.test(current) ? ' · ' + bump(current, k) : ''}` }));
+    const seg = SEMVER.test(current) ? segmented(kinds, draft.kind, k => { draft.kind = k; label.value = bump(current, k); err.textContent = ''; }) : null;
+    const err = el('p', { class: 'share__error' });
+    const save = () => {
+      const v = label.value.trim();
+      if (!VERSION_RE.test(v)) { err.textContent = 'Use letters, digits, dots and hyphens (up to 20 characters).'; label.focus(); return; }
+      if (v === current || r.releases.some(x => x.version === v)) { err.textContent = `Version ${v} already exists.`; label.focus(); return; }
+      r.releases.unshift({ version: current, closedAt: Date.now(), items: r.shipped });
+      r.shipped = [];
+      r.version = v;
+      d.close();
+      touch();
+      toast(`Version ${current} closed — now working on ${v}`);
+    };
+    const d = openDialog({
+      title: 'New version',
+      body: [
+        el('p', { class: 'dialog__msg' }, `Version ${current} (${r.shipped.length} shipped) is closed and archived; its changelog stays available as ${current}.md. The next one starts empty.`),
+        seg && el('div', { class: 'field' }, el('span', { class: 'lbl' }, 'Next version'), seg),
+        field('Version label', label, seg ? 'Edit it if you prefer another number.' : 'Letters, digits, dots and hyphens.'),
+        err
+      ],
+      foot: [el('button', { class: 'btn btn--text', onclick: () => d.close() }, 'Cancel'), el('button', { class: 'btn btn--primary', onclick: save }, 'Close version')]
+    });
+    label.addEventListener('keydown', e => { if (e.key === 'Enter') save(); });
   }
 
   async function deleteItem(id) {
@@ -494,9 +612,11 @@
       it.description && el('p', { class: 'card__desc' }, it.description),
       el('div', { class: 'card__foot' },
         tagEl(it),
+        it.when && el('span', { class: 'card__when', title: 'When', html: icon('calendar') }, it.when),
         el('div', { class: 'card__actions' },
           ci > 0 && el('button', { class: 'btn btn--text btn--icon btn--sm', title: `Move to ${COLS[ci - 1].label}`, 'aria-label': `Move to ${COLS[ci - 1].label}`, html: icon('left'), onclick: () => moveByKey(it.id, -1, 0) }),
           ci < COLS.length - 1 && el('button', { class: 'btn btn--text btn--icon btn--sm', title: `Move to ${COLS[ci + 1].label}`, 'aria-label': `Move to ${COLS[ci + 1].label}`, html: icon('right'), onclick: () => moveByKey(it.id, 1, 0) }),
+          el('button', { class: 'btn btn--text btn--icon btn--sm', title: 'Mark shipped', 'aria-label': 'Mark shipped', html: icon('flag'), onclick: () => shipDialog(it) }),
           el('button', { class: 'btn btn--text btn--icon btn--sm', title: 'Edit', 'aria-label': 'Edit', html: icon('pencil'), onclick: () => itemDialog(it, colId) }),
           el('button', { class: 'btn btn--text btn--icon btn--sm btn--del', title: 'Delete', 'aria-label': 'Delete', html: icon('trash'), onclick: () => deleteItem(it.id) }))));
     card.draggable = true;
@@ -515,6 +635,7 @@
       else if (e.altKey && e.key === 'ArrowRight') { e.preventDefault(); moveByKey(it.id, 1, 0); }
       else if (e.key === 'Enter')  { e.preventDefault(); itemDialog(it, colOf(it.id)); }
       else if (e.key === 'Delete') { e.preventDefault(); deleteItem(it.id); }
+      else if (e.key.toLowerCase() === 's' && !e.altKey && !e.ctrlKey && !e.metaKey) { e.preventDefault(); shipDialog(it); }
     });
     return card;
   }
@@ -691,6 +812,7 @@
       el('div', { class: 'hero__row' },
         el('div', {}, el('h1', {}, r.name), r.tagline && el('p', { class: 'hero__tag' }, r.tagline)),
         el('div', { class: 'actions' },
+          el('button', { class: 'btn btn--outline', title: 'Shipped features and versions', html: icon('flag') + ' Shipped' + (r.shipped.length ? ` · ${r.shipped.length}` : ''), onclick: shippedDialog }),
           el('button', { class: 'btn btn--outline', html: icon('pencil') + ' Edit', onclick: () => roadmapDialog(r) }),
           el('button', { class: 'btn btn--primary', html: icon('share') + ' Share', onclick: shareDialog }))),
       el('div', { class: 'hero__meta' },

@@ -17,7 +17,7 @@ node --env-file=.env server.js    # run locally (see .env.example)
 
 ## Layout
 - `server.js` wiring (CSP, routes) · `src/auth.js` Google sign-in session (refresh token in an encrypted cookie) · `src/public.js` `GET /api/public/:id` · `src/schema.js` cleaning of public files
-- `public/index.html` product page · `public/app.html` + `js/app.js` the app (UI) · `js/sync.js` sign-in tokens, Drive sync, sharing · `r.html` + `js/viewer.js` public page · `embed.js` widget · `app.css` design tokens + components · `js/theme.js`
+- `public/index.html` product page · `public/app.html` + `js/app.js` the app (UI) · `js/sync.js` sign-in tokens, Drive sync, sharing · `r.html` + `js/viewer.js` public page (plain DOM with `app.css`, so page translators can read it; see `docs/PHASE3.md`) · `embed.js` widget (shadow DOM, for other sites) · `app.css` design tokens + components · `js/theme.js`
 - `public/privacy.html` + `terms.html` (linked from the Google consent screen) · `public/product-page.css` · `test/server.test.js` · `test/sync.test.js` (sync.js in a vm against a fake Drive) · `docs/NOTES.md`
 
 ## Rules that matter

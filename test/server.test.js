@@ -253,3 +253,75 @@ test('/r/:id/feed.atom serves an Atom feed of a shared roadmap, one entry per pu
   const off = await listen(createApp({ env: {}, fetchImpl: fakeDrive({}) }));
   try { assert.equal((await fetch(off.base + '/r/GOODFILE12345/feed.atom')).status, 503); } finally { await off.close(); }
 });
+
+// ── Phase 3: dates, shipped changelog, versions ─────────────────────────────────────────
+test('cleanPublic keeps the optional date, the language, the current version and the closed versions — cleaned and capped', () => {
+  const ship = (title, at) => ({ title, description: 'd', tag: 't', tone: 'success', when: 'Q1', shippedAt: at });
+  const doc = cleanPublic({
+    app: 'roadmaps-public', name: 'Acme', lang: 'pt-BR', version: '1.4.0',
+    now: [{ title: 'A', when: 'Q1 2027 and then some more text' }],
+    shipped: [ship('S1', 1760000000000), ship('', 5), { title: 'S3', shippedAt: 'nope' }],
+    releases: [
+      { version: '1.3.0', closedAt: 1750000000000, items: [ship('Old', 1740000000000)] },
+      { version: '../etc', items: [ship('Bad', 1)] },
+      { version: '1.2.0', closedAt: -5, items: 'not a list' }
+    ]
+  });
+  assert.equal(doc.lang, 'pt-BR');
+  assert.equal(doc.version, '1.4.0');
+  assert.equal(doc.now[0].when.length, 12, 'the date is a short text');
+  assert.deepEqual(doc.shipped.map(x => x.title), ['S1', 'S3']);
+  assert.equal(doc.shipped[0].shippedAt, 1760000000000);
+  assert.equal(doc.shipped[1].shippedAt, 0, 'a bad date becomes none');
+  assert.deepEqual(doc.releases.map(v => v.version), ['1.3.0', '1.2.0'], 'an unsafe version label is dropped');
+  assert.deepEqual(doc.releases[1].items, [], 'a non-list of entries is empty');
+  assert.equal(doc.releases[1].closedAt, 0);
+
+  const plain = cleanPublic({ app: 'roadmaps-public', name: 'Old file', lang: '<script>', version: 'a b' });
+  assert.equal(plain.lang, 'en', 'an unknown language falls back to English');
+  assert.equal(plain.version, '');
+  assert.deepEqual([plain.shipped, plain.releases], [[], []], 'files from before Phase 3 still load');
+
+  const big = cleanPublic({ app: 'roadmaps-public', name: 'Big', shipped: Array.from({ length: 150 }, (_, i) => ship('S' + i, 1)), releases: Array.from({ length: 30 }, (_, i) => ({ version: '1.' + i + '.0', items: [] })) });
+  assert.equal(big.shipped.length, 100);
+  assert.equal(big.releases.length, 20);
+});
+
+test('the shipped changelog is rendered as Markdown on the fly, per version, and feeds one entry per closed version', async () => {
+  const doc = {
+    ...GOOD, name: 'Acme', lang: 'en', version: '1.4.0',
+    shipped: [{ title: 'New *thing*', description: 'Does <b>stuff</b>', shippedAt: Date.UTC(2026, 9, 12, 12) }],
+    releases: [{ version: '1.3.0', closedAt: Date.UTC(2026, 8, 30, 12), items: [{ title: 'Old', description: '', shippedAt: Date.UTC(2026, 8, 1, 12) }] }]
+  };
+  const drive = fakeDrive({ GOODFILE12345: { doc } });
+  const s = await listen(createApp({ env: { DRIVE_API_KEY: 'k', PUBLIC_URL: 'https://rm.example' }, fetchImpl: drive }));
+  try {
+    const all = await fetch(s.base + '/r/GOODFILE12345/changelog.md');
+    assert.equal(all.status, 200);
+    assert.match(all.headers.get('content-type'), /^text\/markdown/);
+    const md = await all.text();
+    assert.match(md, /^# Acme — changelog/);
+    assert.match(md, /## 1\.4\.0 \(in progress\)/);
+    assert.ok(md.includes('- **New \\*thing\\*** — Does \\<b\\>stuff\\</b\\> _(2026-10-12)_'), 'user text is escaped, never Markdown or HTML');
+    assert.match(md, /## 1\.3\.0 — closed 2026-09-30/);
+
+    const one = await (await fetch(s.base + '/r/GOODFILE12345/changelog/1.3.0.md')).text();
+    assert.match(one, /^# Acme — version 1\.3\.0/);
+    assert.match(one, /Closed 2026-09-30\./);
+    assert.ok(!one.includes('thing'), 'only that version');
+    const current = await fetch(s.base + '/r/GOODFILE12345/changelog/1.4.0.md');
+    assert.match(await current.text(), /In progress\./);
+    assert.match(current.headers.get('content-disposition'), /version1\.4\.0\.md/);
+
+    assert.equal((await fetch(s.base + '/r/GOODFILE12345/changelog/9.9.9.md')).status, 404, 'no such version');
+    assert.equal((await fetch(s.base + '/r/GOODFILE12345/changelog/..%2Fx.md')).status, 404, 'unsafe label');
+    assert.equal((await fetch(s.base + '/r/GOODFILE12345/changelog/1.3.0.txt')).status, 404, 'only .md');
+    assert.equal((await fetch(s.base + '/r/short/changelog.md')).status, 404, 'bad id never reaches Drive');
+    assert.equal(drive.calls.filter(u => u.includes('/short')).length, 0);
+
+    const atom = await (await fetch(s.base + '/r/GOODFILE12345/feed.atom')).text();
+    assert.match(atom, /<id>https:\/\/rm\.example\/r\/GOODFILE12345#v1\.3\.0<\/id>/, 'one entry per closed version');
+    assert.match(atom, /Acme 1\.3\.0 shipped/);
+    assert.match(atom, /<updated>2026-09-30T12:00:00\.000Z<\/updated>/);
+  } finally { await s.close(); }
+});
