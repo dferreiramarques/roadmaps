@@ -80,17 +80,36 @@
       }).filter(Boolean);
     }
     if (HEX_COLOR.test(raw.color)) r.color = raw.color;
+    if (Number(raw.updatedAt) > 0) r.updatedAt = Math.floor(Number(raw.updatedAt));
     if (raw.share && /^[A-Za-z0-9_-]{10,100}$/.test(raw.share.fileId || '')) r.share = { fileId: raw.share.fileId, createdAt: Number(raw.share.createdAt) || Date.now() };
     return r;
   }
 
+  // "Updated <date>": a roadmap's updatedAt moves only when what visitors would see changes (name, tagline, website, features),
+  // not when tabs are reordered, recoloured or shared. Content is compared against what was last loaded or saved.
+  const contentKey = r => JSON.stringify([r.name, r.tagline, r.url, r.now, r.next, r.later]);
+  const seenContent = new Map();
+  function rememberContent() { seenContent.clear(); roadmaps.forEach(r => seenContent.set(r.id, contentKey(r))); }
+  function stampChanges() {
+    const now = Date.now();
+    for (const r of roadmaps) {
+      const key = contentKey(r);
+      if (seenContent.get(r.id) !== key) {
+        if (seenContent.has(r.id) || !r.updatedAt) r.updatedAt = now;
+        seenContent.set(r.id, key);
+      }
+    }
+    for (const id of [...seenContent.keys()]) if (!roadmaps.some(r => r.id === id)) seenContent.delete(id);
+  }
+
   function applyData(d) {
     roadmaps = (d && Array.isArray(d.roadmaps) ? d.roadmaps : []).map(normalizeRoadmap).filter(Boolean);
+    rememberContent();
     current = roadmaps.some(r => r.id === (d && d.current)) ? d.current : (roadmaps[0] ? roadmaps[0].id : '');
     renderAll();
   }
 
-  function touch() { RMSync.changed(); renderAll(); }
+  function touch() { stampChanges(); RMSync.changed(); renderAll(); }
   function select(id) { current = id; RMSync.changed(); renderAll(); }
 
   // ── toast ───────────────────────────────────────────────────────────────────────────
@@ -215,6 +234,19 @@
       d.close();
       touch();
     };
+    const duplicate = () => {
+      const names = new Set(roadmaps.map(x => x.name));
+      const base = r.name.replace(/\s*\(copy(?: \d+)?\)$/, '').slice(0, 31).trim();   // a copy of a copy is “(copy 2)”, not “(copy) (copy)”
+      let name = `${base} (copy)`;
+      for (let n = 2; names.has(name); n++) name = `${base} (copy ${n})`;
+      const { share, updatedAt, id, ...rest } = JSON.parse(JSON.stringify(r));     // a copy starts private, with new ids
+      const copy = normalizeRoadmap({ ...rest, id: '', name, now: rest.now.map(i => ({ ...i, id: '' })), next: rest.next.map(i => ({ ...i, id: '' })), later: rest.later.map(i => ({ ...i, id: '' })) });
+      roadmaps.splice(roadmaps.findIndex(x => x.id === r.id) + 1, 0, copy);
+      current = copy.id;
+      d.close();
+      touch();
+      toast(`Duplicated as “${copy.name}” — private until you share it`);
+    };
     const foot = [
       !isNew && el('button', { class: 'btn btn--text btn--danger-text btn--del-left', onclick: async () => {
         const shared = r.share ? ' Its public page and embed stop working.' : '';
@@ -226,6 +258,7 @@
         touch();
         RMSync.share.publish();
       } }, 'Delete roadmap'),
+      !isNew && el('button', { class: 'btn btn--text', onclick: duplicate }, 'Duplicate'),
       el('button', { class: 'btn btn--text', onclick: () => d.close() }, 'Cancel'),
       el('button', { class: 'btn btn--primary', onclick: save }, isNew ? 'Create roadmap' : 'Save')
     ];
@@ -239,6 +272,7 @@
 
   // ── share dialog ────────────────────────────────────────────────────────────────────
   const publicUrl = r => `${location.origin}/r/${r.share.fileId}`;
+  const feedUrl = r => `${publicUrl(r)}/feed.atom`;
   const embedCode = r => `<div data-roadmap="${r.share.fileId}" data-header="true"></div>\n<script src="${location.origin}/embed.js" defer></script>`;
 
   function shareDialog() {
@@ -269,6 +303,7 @@
       }
 
       const pageInput = el('input', { class: 'input mono', readonly: true, value: publicUrl(r) });
+      const feedInput = el('input', { class: 'input mono', readonly: true, value: feedUrl(r) });
       const code = el('textarea', { class: 'textarea mono code', readonly: true, rows: '3' }, embedCode(r));
       const copyRow = (input) => el('div', { class: 'copyrow' }, input,
         el('button', { class: 'btn btn--outline', html: icon('copy') + ' Copy', onclick: async () => toast(await copyText(input.value) ? 'Copied' : 'Couldn’t copy — select the text and copy it', 'ok') }));
@@ -277,6 +312,8 @@
         copyRow(pageInput),
         field('Embed on your website', code, 'Paste it where the roadmap should appear. It follows your site’s light/dark theme.'),
         copyRow(code),
+        field('Updates feed (Atom)', feedInput, 'Add it to a feed reader: a new entry appears each time you publish a change.'),
+        copyRow(feedInput),
         el('p', { class: 'dialog__msg dim' }, 'The page and the snippet stay up to date — every change you make here is published within seconds.'),
         err);
       put(d.foot, 
@@ -659,7 +696,8 @@
       el('div', { class: 'hero__meta' },
         el('button', { class: 'chip chip--btn ' + (r.share ? 'chip--ok' : 'chip--muted'), title: r.share ? 'Public — click for the link and embed code' : 'Private — click to share', html: icon(r.share ? 'rocket' : 'lock') + (r.share ? ' Public' : ' Private'), onclick: shareDialog }),
         r.share && el('a', { href: publicUrl(r), target: '_blank', rel: 'noopener' }, 'Open public page'),
-        r.url && el('a', { href: r.url, target: '_blank', rel: 'noopener' }, host)));
+        r.url && el('a', { href: r.url, target: '_blank', rel: 'noopener' }, host),
+        r.updatedAt && el('span', { title: new Date(r.updatedAt).toLocaleString() }, 'Updated ' + new Date(r.updatedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }))));
     document.title = `${r.name} · Roadmaps`;
   }
 

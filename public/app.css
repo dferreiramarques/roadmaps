@@ -280,8 +280,9 @@ body.readonly .only-edit { display: none !important; }
 .dialog__title { font-size: 1.125rem; font-weight: 600; letter-spacing: -.01em; }
 .dialog__body { padding: 16px 24px 4px; display: flex; flex-direction: column; gap: 16px; }
 .dialog__msg { color: var(--muted); font-size: .9375rem; }
-.dialog__foot { display: flex; justify-content: flex-end; gap: 8px; padding: 20px 24px 24px; }
+.dialog__foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding: 20px 24px 24px; }
 .dialog__foot .btn--del-left { margin-right: auto; }
+@media (max-width: 520px) { .dialog__foot .btn--del-left { flex-basis: 100%; justify-content: flex-start; margin-right: 0; } }
 
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field > label, .field > .lbl { font-size: .875rem; font-weight: 500; }

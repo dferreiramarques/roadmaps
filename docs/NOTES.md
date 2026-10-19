@@ -54,7 +54,7 @@ Done on 2026-10-19 except where marked. The step-by-step is in the README ("Set 
 ## 7. Suggested plan
 
 - **Phase 1 — ship:** done: consent screen In production, Taskboards and Diagramico roadmaps recreated here and embedded on both product pages (Diagramico shows the English roadmap in both languages), `taskboards/roadmap.html` redirects here. Left: retire the old copies (`roadmap.js`, `roadmap.css`, `roadmap-embed.js`, `roadmap.json` in Taskboards; the service worker still lists `roadmap-embed.js`).
-- **Phase 2 — polish:** (roadmap ordering and per-roadmap colour are done) duplicate roadmap, a privacy page + terms linked from the consent screen, "last updated" control, nicer public page header, RSS/Atom feed of changes.
+- **Phase 2 — polish:** done: roadmap ordering and colour, privacy page + terms, favicon, **duplicate roadmap** (Edit dialog → Duplicate: a private copy with new ids, `(copy)`, `(copy 2)`…), **"Updated <date>"** (the app stamps `updatedAt` on a roadmap only when its visible content changes; the public page and widget already show the Drive modification time as "Last updated"), **Atom feed** at `/r/<id>/feed.atom` (stateless: one entry per publication, its id carries the publication time, summary = Now / Next / Later titles; the public page advertises it and the Share dialog shows its address). Left: nicer public page header.
 - **Phase 3 — richer items:** status/dates/links, Shipped/changelog, PT/EN translations.
 - **Phase 4 — audience:** opt-in subscribe, votes, analytics (settle privacy and a database first).
 - **Phase 5 — teams:** shared roadmaps with roles, own-tenant installation.
