@@ -544,3 +544,11 @@ body.tab-dragging, body.tab-dragging * { cursor: grabbing !important; }
 
 .lp-center { text-align: center; }
 .lp-head--center { margin: 0 auto 24px; }
+
+/* legal pages (privacy, terms) */
+.doc { max-width: 720px; padding-top: 48px; padding-bottom: 64px; line-height: 1.65; }
+.doc h1 { font-size: 2rem; margin: 0 0 4px; }
+.doc h2 { font-size: 1.15rem; margin: 32px 0 8px; }
+.doc__date { color: var(--subtle); margin: 0 0 24px; }
+.doc ul { padding-left: 20px; }
+.doc a { color: var(--primary); }

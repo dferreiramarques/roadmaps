@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy policy — Roadmaps</title>
+  <script src="/js/theme.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/app.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar__in">
+      <a class="brand" href="/">
+        <span class="brand__mark" aria-hidden="true">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h6M4 12h10M4 18h14"/><circle cx="17" cy="6" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+        </span>
+        Roadmaps
+      </a>
+      <span class="grow"></span>
+      <a class="btn btn--outline btn--sm" href="/app">Open the app</a>
+      <button class="btn btn--text btn--icon" id="btn-theme" aria-label="Toggle light / dark theme" title="Toggle theme"></button>
+    </div>
+  </header>
+
+  <main class="wrap doc">
+<h1>Privacy policy</h1>
+<p class="doc__date">Last updated 19 October 2026</p>
+<p>Roadmaps (<a href="https://roadmaps.monco.io">roadmaps.monco.io</a>) lets you keep Now / Next / Later roadmaps for your products. This page explains what happens to your data.</p>
+
+<h2>What we do not do</h2>
+<p>Roadmaps has no database and does not store your roadmaps. Your data goes from your browser to your own Google Drive and nowhere else. We do not sell, share or analyse your data, and we use no advertising or tracking cookies.</p>
+
+<h2>What Roadmaps accesses in your Google account</h2>
+<ul>
+  <li><strong>Your name, email and profile picture</strong>, shown in the app so you can see which account is signed in. They are read in your browser and are not stored by us.</li>
+  <li><strong>A private app folder in your Google Drive</strong> (scope <code>drive.appdata</code>), where your roadmaps are saved in one file. Only Roadmaps can see this folder.</li>
+  <li><strong>Files that Roadmaps itself creates</strong> (scope <code>drive.file</code>), used only when you make a roadmap public: a separate copy readable by anyone with the link. Roadmaps cannot see any other file in your Drive.</li>
+</ul>
+<p>Roadmaps uses this access only to load and save your roadmaps and to publish or unpublish a public copy when you ask. Use of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+
+<h2>What our server handles</h2>
+<ul>
+  <li><strong>Sign-in:</strong> to keep you signed in, the server keeps a Google refresh token in an encrypted cookie in your browser. The server itself does not store it.</li>
+  <li><strong>Public roadmaps:</strong> when a visitor opens a public roadmap page or embed, the server reads the public copy from Google Drive and returns it. Public copies contain only the roadmap content you wrote, with no account data.</li>
+  <li><strong>Logs:</strong> our hosting provider (Railway) may keep standard request logs, such as IP addresses, for security and operation.</li>
+</ul>
+
+<h2>In your browser</h2>
+<p>Roadmaps keeps a local copy of your roadmaps and your theme choice in your browser storage so it works offline. Signing out or clearing site data removes it.</p>
+
+<h2>Your control</h2>
+<ul>
+  <li>Make a roadmap private, or delete it, and its public copy is deleted from your Drive.</li>
+  <li>Revoke Roadmaps at any time in your <a href="https://myaccount.google.com/permissions">Google Account permissions</a>.</li>
+  <li>Delete your data by removing the app data from Google Drive (Settings → Manage apps → Roadmaps).</li>
+</ul>
+
+<h2>Changes</h2>
+<p>If this policy changes, the new version will be published on this page with a new date.</p>
+</main>
+
+  <footer class="lp-foot">
+    <div class="wrap">
+      <span>© 2026 Roadmaps</span>
+      <span><a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></span>
+    </div>
+  </footer>
+</body>
+</html>
