@@ -353,9 +353,13 @@ window.RMSync = (() => {
   const publicDoc = r => ({
     app: 'roadmaps-public', v: 1,
     name: r.name, tagline: r.tagline || '', url: r.url || '',
-    now: r.now.map(slim), next: r.next.map(slim), later: r.later.map(slim)
+    lang: r.lang || 'en', version: r.version || '',
+    now: r.now.map(slim), next: r.next.map(slim), later: r.later.map(slim),
+    shipped: (r.shipped || []).slice(0, 100).map(slimShipped),
+    releases: (r.releases || []).slice(0, 20).map(v => ({ version: v.version, closedAt: v.closedAt || 0, items: (v.items || []).slice(0, 100).map(slimShipped) }))
   });
-  const slim = it => ({ title: it.title, description: it.description || '', tag: it.tag || '', tone: it.tone || 'secondary' });
+  const slim = it => ({ title: it.title, description: it.description || '', tag: it.tag || '', tone: it.tone || 'secondary', when: it.when || '' });
+  const slimShipped = it => ({ ...slim(it), shippedAt: it.shippedAt || 0 });
   const stamped = doc => JSON.stringify({ ...doc, publishedAt: Date.now() });
 
   async function shareCreate(r) {

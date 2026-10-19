@@ -258,7 +258,7 @@ test('sharing: creates a link-readable copy with only public fields; refuses wit
   assert.deepEqual(t.drive.perms, [{ id: share.fileId, role: 'reader', type: 'anyone', allowFileDiscovery: false }]);
   const pub = t.drive.content(share.fileId);
   assert.equal(pub.app, 'roadmaps-public');
-  assert.deepEqual(Object.keys(pub.now[0]).sort(), ['description', 'tag', 'title', 'tone']);
+  assert.deepEqual(Object.keys(pub.now[0]).sort(), ['description', 'tag', 'title', 'tone', 'when']);
   assert.equal(JSON.stringify(pub).includes('secret-id'), false);
   assert.equal(r.share.fileId, share.fileId);
 

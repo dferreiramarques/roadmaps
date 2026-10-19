@@ -7,14 +7,15 @@
 // their own Google API key.
 //
 //   GET /api/public/:id      → { id, name, tagline, url, now, next, later, updatedAt }
-//   GET /r/:id/feed.atom     → Atom feed of the same roadmap: one entry per publication (see feed() below)
+//   GET /r/:id/feed.atom     → Atom feed of the same roadmap: one entry per publication and per closed version (see feed() below)
+//   GET /r/:id/changelog.md, /r/:id/changelog/<version>.md → the shipped changelog as Markdown, rendered on the fly
 //
 // The server holds no roadmap data: it fetches the file with a read-only API key, checks it really is a
 // Roadmaps file, cleans it, and caches the result for a short while.
 
 const crypto = require('node:crypto');
 const express = require('express');
-const { cleanPublic } = require('./schema');
+const { cleanPublic, VERSION } = require('./schema');
 
 const ID = /^[A-Za-z0-9_-]{10,100}$/;
 const xml = v => String(v == null ? '' : v).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[ch]));
@@ -30,6 +31,17 @@ function feed(doc, origin) {
   const updated = isNaN(when) ? new Date(0).toISOString() : when.toISOString();
   const line = (label, items) => `${label}: ${items.length ? items.map(i => i.title).join('; ') : 'nothing planned yet'}`;
   const summary = [line('Now', doc.now), line('Next', doc.next), line('Later', doc.later)].join('\n');
+  const releases = (doc.releases || []).map(v => {
+    const closed = v.closedAt ? new Date(v.closedAt).toISOString() : updated;
+    return `  <entry>
+    <title>${xml(doc.name)} ${xml(v.version)} shipped</title>
+    <id>${xml(page)}#v${xml(v.version)}</id>
+    <link rel="alternate" type="text/markdown" href="${xml(page)}/changelog/${xml(encodeURIComponent(v.version))}.md"/>
+    <updated>${closed}</updated>
+    <content type="text">${xml(v.items.length ? v.items.map(i => i.title).join('\n') : 'No entries')}</content>
+  </entry>
+`;
+  }).join('');
   return `<?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
   <title>${xml(doc.name)} — roadmap</title>
@@ -44,8 +56,27 @@ function feed(doc, origin) {
     <updated>${updated}</updated>
     <content type="text">${xml(summary)}</content>
   </entry>
-</feed>
+${releases}</feed>
 `;
+}
+
+// The shipped changelog as Markdown. Rendered from the public copy on every request; nothing is stored.
+const mdText = v => String(v == null ? '' : v).replace(/([\\`*_{}\[\]<>#|~])/g, '\\$1');
+const ymd = ms => (ms ? new Date(ms).toISOString().slice(0, 10) : '');
+function mdEntries(items) {
+  if (!items.length) return '_Nothing shipped yet._\n';
+  return items.map(i => `- **${mdText(i.title)}**${i.description ? ` — ${mdText(i.description)}` : ''}${i.shippedAt ? ` _(${ymd(i.shippedAt)})_` : ''}`).join('\n') + '\n';
+}
+function changelogMd(doc, version) {
+  const cur = doc.version ? { version: doc.version, closedAt: 0, items: doc.shipped, current: true } : null;
+  const all = [...(cur && (cur.items.length || !doc.releases.length) ? [cur] : []), ...doc.releases];
+  const heading = v => `## ${mdText(v.version)}${v.current ? ' (in progress)' : v.closedAt ? ` — closed ${ymd(v.closedAt)}` : ''}`;
+  if (version) {
+    const v = all.find(x => x.version === version) || (cur && cur.version === version ? cur : null);
+    if (!v) return null;
+    return `# ${mdText(doc.name)} — version ${mdText(v.version)}\n\n${v.current ? 'In progress.' : v.closedAt ? `Closed ${ymd(v.closedAt)}.` : ''}\n\n${mdEntries(v.items)}`;
+  }
+  return `# ${mdText(doc.name)} — changelog\n\n${all.length ? all.map(v => `${heading(v)}\n\n${mdEntries(v.items)}`).join('\n') : '_Nothing shipped yet._\n'}`;
 }
 
 function createPublic(opts = {}) {
@@ -113,17 +144,43 @@ function createPublic(opts = {}) {
     res.json(e.body);
   });
 
-  router.get('/r/:id/feed.atom', async (req, res) => {
+  // the checks every public route shares; resolves to the cached entry, or null after answering
+  async function guard(req, res) {
     res.set({ 'Access-Control-Allow-Origin': '*', 'Cross-Origin-Resource-Policy': 'cross-origin' });
-    if (!enabled) return res.status(503).type('text/plain').send('Public roadmaps are not switched on.');
-    if (!ID.test(req.params.id)) return res.status(404).type('text/plain').send('No such roadmap.');
-    if (limited(req.ip)) return res.status(429).type('text/plain').send('Too many requests.');
+    const plain = (code, text) => { res.set('Cache-Control', 'no-store'); res.status(code).type('text/plain').send(text); return null; };
+    if (!enabled) return plain(503, 'Public roadmaps are not switched on.');
+    if (!ID.test(req.params.id)) return plain(404, 'No such roadmap.');
+    if (limited(req.ip)) return plain(429, 'Too many requests.');
     const e = await load(req.params.id);
-    if (e.status !== 200) { res.set('Cache-Control', 'no-store'); return res.status(e.status === 404 ? 404 : 502).type('text/plain').send(e.body.message || 'Not available.'); }
-    const tag = e.etag.replace(/"$/, '-atom"');
+    if (e.status !== 200) return plain(e.status === 404 ? 404 : 502, e.body.message || 'Not available.');
+    return e;
+  }
+  function send(req, res, e, kind, type, body) {
+    const tag = e.etag.replace(/"$/, `-${kind}"`);
     res.set({ 'Cache-Control': 'public, max-age=300', ETag: tag });
     if (req.headers['if-none-match'] === tag) return res.status(304).end();
-    res.type('application/atom+xml; charset=utf-8').send(feed(e.body, origin || `${req.protocol}://${req.get('host')}`));
+    res.type(type).send(body);
+  }
+  const base = req => origin || `${req.protocol}://${req.get('host')}`;
+
+  router.get('/r/:id/feed.atom', async (req, res) => {
+    const e = await guard(req, res); if (!e) return;
+    send(req, res, e, 'atom', 'application/atom+xml; charset=utf-8', feed(e.body, base(req)));
+  });
+  router.get('/r/:id/changelog.md', async (req, res) => {
+    const e = await guard(req, res); if (!e) return;
+    res.set('Content-Disposition', 'inline; filename="changelog.md"');
+    send(req, res, e, 'md', 'text/markdown; charset=utf-8', changelogMd(e.body, ''));
+  });
+  router.get('/r/:id/changelog/:file', async (req, res) => {
+    const m = /^(.+)\.md$/.exec(req.params.file);
+    const version = m && VERSION.test(m[1]) ? m[1] : '';
+    if (!version) return res.status(404).type('text/plain').send('No such version.');
+    const e = await guard(req, res); if (!e) return;
+    const md = changelogMd(e.body, version);
+    if (md == null) { res.set('Cache-Control', 'no-store'); return res.status(404).type('text/plain').send('No such version.'); }
+    res.set('Content-Disposition', `inline; filename="version${version}.md"`);
+    send(req, res, e, 'md-' + version, 'text/markdown; charset=utf-8', md);
   });
 
   return { router, enabled };
