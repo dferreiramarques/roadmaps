@@ -272,6 +272,7 @@
 
   // ── share dialog ────────────────────────────────────────────────────────────────────
   const publicUrl = r => `${location.origin}/r/${r.share.fileId}`;
+  const feedUrl = r => `${publicUrl(r)}/feed.atom`;
   const embedCode = r => `<div data-roadmap="${r.share.fileId}" data-header="true"></div>\n<script src="${location.origin}/embed.js" defer></script>`;
 
   function shareDialog() {
@@ -302,6 +303,7 @@
       }
 
       const pageInput = el('input', { class: 'input mono', readonly: true, value: publicUrl(r) });
+      const feedInput = el('input', { class: 'input mono', readonly: true, value: feedUrl(r) });
       const code = el('textarea', { class: 'textarea mono code', readonly: true, rows: '3' }, embedCode(r));
       const copyRow = (input) => el('div', { class: 'copyrow' }, input,
         el('button', { class: 'btn btn--outline', html: icon('copy') + ' Copy', onclick: async () => toast(await copyText(input.value) ? 'Copied' : 'Couldn’t copy — select the text and copy it', 'ok') }));
@@ -310,6 +312,8 @@
         copyRow(pageInput),
         field('Embed on your website', code, 'Paste it where the roadmap should appear. It follows your site’s light/dark theme.'),
         copyRow(code),
+        field('Updates feed (Atom)', feedInput, 'Add it to a feed reader: a new entry appears each time you publish a change.'),
+        copyRow(feedInput),
         el('p', { class: 'dialog__msg dim' }, 'The page and the snippet stay up to date — every change you make here is published within seconds.'),
         err);
       put(d.foot, 

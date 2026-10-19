@@ -227,3 +227,29 @@ test('product-page.css (copied into the Taskboards and Diagramico repos) still m
   assert.ok(landing.length > 500);
   assert.ok(read('product-page.css').includes(landing), 'regenerate product-page.css from app.css and copy it to the other repos');
 });
+
+test('/r/:id/feed.atom serves an Atom feed of a shared roadmap, one entry per publication', async () => {
+  const doc = { ...GOOD, name: 'Acme & <Co>', tagline: 'Say "hi"', now: [{ title: 'Ship <b>it</b>' }], next: [{ title: 'Next one' }] };
+  const drive = fakeDrive({ GOODFILE12345: { doc, modifiedTime: '2026-10-19T10:00:00.000Z' }, NOTOURS123456: { doc: { hello: 'world' } } });
+  const s = await listen(createApp({ env: { DRIVE_API_KEY: 'k', PUBLIC_URL: 'https://rm.example/' }, fetchImpl: drive }));
+  try {
+    const r = await fetch(s.base + '/r/GOODFILE12345/feed.atom');
+    assert.equal(r.status, 200);
+    assert.match(r.headers.get('content-type'), /^application\/atom\+xml/);
+    const body = await r.text();
+    assert.match(body, /<feed xmlns="http:\/\/www\.w3\.org\/2005\/Atom">/);
+    assert.match(body, /<title>Acme &amp; &lt;Co&gt; — roadmap<\/title>/, 'text is escaped');
+    assert.ok(!body.includes('<b>'), 'user text never becomes markup');
+    assert.match(body, /<id>https:\/\/rm\.example\/r\/GOODFILE12345<\/id>/, 'addresses come from PUBLIC_URL');
+    assert.match(body, /<id>https:\/\/rm\.example\/r\/GOODFILE12345#2026-10-19T10:00:00\.000Z<\/id>/, 'the entry id changes with every publication');
+    assert.match(body, /Now: Ship &lt;b&gt;it&lt;\/b&gt;\nNext: Next one\nLater: nothing planned yet/);
+    const again = await fetch(s.base + '/r/GOODFILE12345/feed.atom', { headers: { 'If-None-Match': r.headers.get('etag') } });
+    assert.equal(again.status, 304);
+    assert.equal((await fetch(s.base + '/r/NOTOURS123456/feed.atom')).status, 404, 'a Drive file that is not a roadmap');
+    assert.equal((await fetch(s.base + '/r/MISSINGFILE123/feed.atom')).status, 404, 'unshared / deleted');
+    assert.equal((await fetch(s.base + '/r/short/feed.atom')).status, 404, 'bad id never reaches Drive');
+    assert.equal(drive.calls.filter(u => u.includes('short')).length, 0);
+  } finally { await s.close(); }
+  const off = await listen(createApp({ env: {}, fetchImpl: fakeDrive({}) }));
+  try { assert.equal((await fetch(off.base + '/r/GOODFILE12345/feed.atom')).status, 503); } finally { await off.close(); }
+});
