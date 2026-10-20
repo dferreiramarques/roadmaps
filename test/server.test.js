@@ -97,8 +97,10 @@ test('public endpoint is rate limited per IP', async () => {
 
 // ── Google sign-in (against a fake Google) ──────────────────────────────────────────────
 function fakeGoogle() {
-  const idTok = 'x.' + Buffer.from(JSON.stringify({ sub: 'u1', email: 'a@b.c', name: 'A B', given_name: 'A', picture: 'p' })).toString('base64url') + '.y';
-  const state = { revoked: [], mode: 'ok', scope: 'openid email https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file', refresh: true };
+  const tokOf = claims => 'x.' + Buffer.from(JSON.stringify(claims)).toString('base64url') + '.y';
+  const idTok = tokOf({ sub: 'u1', email: 'a@b.c', name: 'A B', given_name: 'A', picture: 'p' });
+  const bareTok = tokOf({ sub: 'u1', email: 'a@b.c' });   // what Google may return on a refresh
+  const state = { revoked: [], mode: 'ok', bare: false, userinfo: [], scope: 'openid email https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file', refresh: true };
   const server = http.createServer((req, res) => {
     let body = '';
     req.on('data', d => (body += d));
@@ -106,13 +108,14 @@ function fakeGoogle() {
       const p = Object.fromEntries(new URLSearchParams(body));
       res.setHeader('Content-Type', 'application/json');
       if (req.url === '/revoke') { state.revoked.push(p.token); return res.end('{}'); }
+      if (req.url === '/userinfo') { state.userinfo.push(req.headers.authorization); return res.end(JSON.stringify({ sub: 'u1', email: 'a@b.c', name: 'A B', given_name: 'A', picture: 'p' })); }
       if (p.grant_type === 'authorization_code') {
         if (p.client_secret !== 'SECRET' || p.code !== 'CODE1') { res.writeHead(400); return res.end('{"error":"invalid_grant"}'); }
         return res.end(JSON.stringify({ access_token: 'AT1', expires_in: 3599, scope: state.scope, id_token: idTok, ...(state.refresh ? { refresh_token: 'RT1' } : {}) }));
       }
       if (state.mode === 'revoked' || p.refresh_token !== 'RT1') { res.writeHead(400); return res.end('{"error":"invalid_grant"}'); }
       if (state.mode === 'down') { res.writeHead(503); return res.end('{}'); }
-      res.end(JSON.stringify({ access_token: 'AT2', expires_in: 3599, scope: state.scope, id_token: idTok }));
+      res.end(JSON.stringify({ access_token: 'AT2', expires_in: 3599, scope: state.scope, id_token: state.bare ? bareTok : idTok }));
     });
   });
   return new Promise(res => server.listen(0, () => res({ state, port: server.address().port, close: () => new Promise(r => server.close(r)) })));
@@ -121,7 +124,7 @@ function fakeGoogle() {
 test('sign-in: login redirect, code exchange, refresh, logout', async () => {
   const g = await fakeGoogle();
   const env = { GOOGLE_CLIENT_ID: 'CID', GOOGLE_CLIENT_SECRET: 'SECRET', COOKIE_SECRET: 'cookie-secret',
-    GOOGLE_AUTH_URL: `http://127.0.0.1:${g.port}/auth`, GOOGLE_TOKEN_URL: `http://127.0.0.1:${g.port}/token`, GOOGLE_REVOKE_URL: `http://127.0.0.1:${g.port}/revoke` };
+    GOOGLE_AUTH_URL: `http://127.0.0.1:${g.port}/auth`, GOOGLE_TOKEN_URL: `http://127.0.0.1:${g.port}/token`, GOOGLE_REVOKE_URL: `http://127.0.0.1:${g.port}/revoke`, GOOGLE_USERINFO_URL: `http://127.0.0.1:${g.port}/userinfo` };
   const s = await listen(createApp({ env }));
   const jar = {};
   const cookies = () => Object.entries(jar).map(([k, v]) => `${k}=${v}`).join('; ');
@@ -162,6 +165,14 @@ test('sign-in: login redirect, code exchange, refresh, logout', async () => {
     assert.equal(b.user.email, 'a@b.c');
     assert.ok(b.scope.includes('drive.file'));
     assert.equal(r.headers.get('cache-control'), 'no-store');
+    assert.equal(g.state.userinfo.length, 0, 'a full id_token needs no userinfo call');
+
+    g.state.bare = true;
+    r = await call('/auth/refresh', { method: 'POST', headers: ORIGIN });
+    const b2 = await r.json();
+    assert.deepEqual([b2.user.name, b2.user.given_name, b2.user.picture], ['A B', 'A', 'p'], 'name and picture filled in from userinfo');
+    assert.deepEqual(g.state.userinfo, ['Bearer AT2']);
+    g.state.bare = false;
 
     assert.equal((await call('/auth/refresh', { method: 'POST', headers: { Origin: 'https://evil.example' } })).status, 403);
     assert.equal((await call('/auth/refresh', { method: 'POST' })).status, 403);

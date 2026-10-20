@@ -76,7 +76,7 @@ Use **its own Google Cloud project** (not Taskboards'): the consent screen shows
 - **Private:** `roadmaps-data.json` in your Drive's private app folder — `{ app: "roadmaps", version: 1, current, roadmaps: [{ id, name, tagline, url, now, next, later, share?: { fileId } }] }`.
 - **Public copy:** a Drive file `Roadmap — <name>` readable by anyone with the link — `{ app: "roadmaps-public", name, tagline, url, now, next, later }`. Item ids and everything else about your account are left out.
 - An item is `{ title, description, tag, tone }`, `tone` one of `success info warn danger secondary contrast`.
-- **Backup:** *user menu → Export backup* downloads everything; *Import* restores it (it also accepts the older `{ products: [...] }` roadmap.json shape).
+- **Backup:** *user menu → Export backup* downloads everything; *Import* restores it — *Replace all*, or *Merge* (same roadmap id → the file's version, new ones added, the rest kept) (it also accepts the older `{ products: [...] }` roadmap.json shape).
 
 ## Security, briefly
 

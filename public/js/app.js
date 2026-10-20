@@ -226,6 +226,26 @@
     });
   }
 
+  // importing a backup: replace everything, or merge into what is here → 'replace' | 'merge' | null
+  function importDialog({ file, count, updates, orphaned }) {
+    return new Promise(resolve => {
+      let done = false;
+      const finish = v => { if (done) return; done = true; d.close(); resolve(v); };
+      const merge = updates ? `Merge updates ${updates} roadmap(s) you already have and adds ${count - updates} new one(s); the rest stay as they are.` : `Merge adds them next to the roadmaps you already have.`;
+      const replace = 'Replace all removes everything here first.' + (orphaned ? ` ${orphaned} public roadmap(s) not in the file will stop being shared.` : '');
+      const d = openDialog({
+        title: 'Import roadmaps',
+        body: el('p', { class: 'dialog__msg' }, `“${file}” has ${count} roadmap(s). ${merge} ${replace}`),
+        foot: [
+          el('button', { class: 'btn btn--text', onclick: () => finish(null) }, 'Cancel'),
+          el('button', { class: 'btn btn--danger', onclick: () => finish('replace') }, 'Replace all'),
+          el('button', { class: 'btn btn--primary', onclick: () => finish('merge') }, 'Merge')
+        ],
+        onClose: () => finish(null)
+      });
+    });
+  }
+
   function field(label, control, hint) {
     const id = 'f' + uid();
     control.id = id;
@@ -938,13 +958,22 @@
       list.forEach(r => { const old = keep.get(r.id); if (old && old.share) r.share = old.share; else delete r.share; });   // a backup never carries someone else's public link
       const kept = new Set(list.filter(r => r.share).map(r => r.share.fileId));
       const orphaned = roadmaps.filter(r => r.share && !kept.has(r.share.fileId));
-      if (!await confirmDialog({ title: 'Replace your roadmaps?', message: `Everything here is replaced by the ${list.length} roadmap(s) in “${f.name}”.` + (orphaned.length ? ` ${orphaned.length} public roadmap(s) not in the file will stop being shared.` : ''), confirm: 'Replace', danger: true })) return;
-      orphaned.forEach(r => RMSync.share.queueRevoke(r.share.fileId));
-      roadmaps = list;
-      current = list.some(r => r.id === parsed.current) ? parsed.current : list[0].id;
+      const updates = list.filter(r => keep.has(r.id)).length;
+      const mode = roadmaps.length ? await importDialog({ file: f.name, count: list.length, updates, orphaned: orphaned.length }) : 'replace';
+      if (!mode) return;
+      if (mode === 'replace') {
+        orphaned.forEach(r => RMSync.share.queueRevoke(r.share.fileId));
+        roadmaps = list;
+        current = list.some(r => r.id === parsed.current) ? parsed.current : list[0].id;
+      } else {
+        // same id → the file's version takes that roadmap's place (and keeps its public link); new ids go at the end
+        const byId = new Map(list.map(r => [r.id, r]));
+        roadmaps = [...roadmaps.map(r => byId.get(r.id) || r), ...list.filter(r => !keep.has(r.id))];
+        current = list.some(r => r.id === parsed.current) ? parsed.current : list[0].id;
+      }
       touch();
       RMSync.share.publish();
-      toast(`Imported ${list.length} roadmap(s)`);
+      toast(mode === 'merge' ? `Merged ${list.length} roadmap(s)` : `Imported ${list.length} roadmap(s)`);
     } catch { toast('That file isn’t a valid Roadmaps backup', 'warn'); }
   });
 

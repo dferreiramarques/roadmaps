@@ -59,7 +59,13 @@ window.RMSync = (() => {
     try { sessionStorage.setItem(SS_TOKEN, JSON.stringify({ token, exp: tokenExp, scope: scopes })); } catch {}
     clearTimeout(refreshTimer);
     refreshTimer = setTimeout(() => ensureToken(), Math.max(5000, tokenExp - SKEW - Date.now()));
-    if (r.user && r.user.sub) { user = r.user; set(LS.hint, JSON.stringify(user)); }
+    if (r.user && r.user.sub) {
+      // a refreshed profile may lack name/picture: keep the ones we already had for the same account
+      const prev = user && user.sub === r.user.sub ? user : {};
+      user = { ...r.user };
+      for (const k of ['email', 'name', 'given_name', 'picture']) if (!user[k] && prev[k]) user[k] = prev[k];
+      set(LS.hint, JSON.stringify(user));
+    }
   }
 
   function restoreToken() {

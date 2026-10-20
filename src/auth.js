@@ -33,6 +33,7 @@ function createAuth(opts = {}) {
   const authUrl = env.GOOGLE_AUTH_URL || 'https://accounts.google.com/o/oauth2/v2/auth';
   const tokenUrl = env.GOOGLE_TOKEN_URL || 'https://oauth2.googleapis.com/token';
   const revokeUrl = env.GOOGLE_REVOKE_URL || 'https://oauth2.googleapis.com/revoke';
+  const userinfoUrl = env.GOOGLE_USERINFO_URL || 'https://openidconnect.googleapis.com/v1/userinfo';
 
   const enabled = !!(clientId && clientSecret && cookieSecret);
   const key = enabled ? Buffer.from(crypto.hkdfSync('sha256', cookieSecret, 'roadmaps', 'cookie-encryption', 32)) : null;
@@ -82,6 +83,20 @@ function createAuth(opts = {}) {
       return { sub: p.sub, email: p.email, name: p.name, given_name: p.given_name, picture: p.picture };
     } catch { return null; }
   };
+
+  // Google often leaves name/picture out of the id_token it returns on a refresh, so fill them in from userinfo.
+  // Best effort: the sign-in still works (with the e-mail only) if this call fails.
+  async function profileFor(tok) {
+    const p = tok.id_token ? profileOf(tok.id_token) : null;
+    if (p && p.name && p.picture) return p;
+    try {
+      const r = await fetch(userinfoUrl, { headers: { Authorization: `Bearer ${tok.access_token}` }, signal: AbortSignal.timeout(4000) });
+      if (!r.ok) return p;
+      const u = await r.json();
+      if (!u.sub || (p && u.sub !== p.sub)) return p;
+      return { sub: u.sub, email: u.email || p?.email, name: u.name || p?.name, given_name: u.given_name || p?.given_name, picture: u.picture || p?.picture };
+    } catch { return p; }
+  }
 
   // a few attempts per IP per window
   const hits = new Map();
@@ -152,7 +167,7 @@ function createAuth(opts = {}) {
       return res.status(502).json({ error: 'upstream' });
     }
     setCookie(req, res, COOKIE_RT, seal(tok.body.refresh_token || rt), RT_MAX_AGE);   // slide the expiry
-    res.json({ access_token: tok.body.access_token, expires_in: tok.body.expires_in, scope: tok.body.scope, user: tok.body.id_token ? profileOf(tok.body.id_token) : null });
+    res.json({ access_token: tok.body.access_token, expires_in: tok.body.expires_in, scope: tok.body.scope, user: await profileFor(tok.body) });
   });
 
   router.post('/logout', needEnabled, sameOrigin, async (req, res) => {
