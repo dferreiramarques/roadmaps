@@ -405,17 +405,25 @@ a.user__item { color: inherit; text-decoration: none; }
 .user__row { align-items: center; justify-content: space-between; gap: 12px; }
 .user__row .ico { width: 16px; height: 16px; }
 .theme-ico { display: inline-flex; }
+.rtab-nav { display: none; }
 .more-btn { display: none; position: relative; }
 .more-btn[data-sync="error"]::after { content: ""; position: absolute; top: 5px; right: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--danger); }
 
-/* phones: the top bar keeps only the roadmap tabs and a ⋮ menu — brand, sync status, theme and account move into the menu */
+/* phones: the top bar keeps only the open roadmap with ‹ › and a ☰ menu — brand, sync status, theme and account move into the menu */
 @media (max-width: 700px) {
   .topbar__in { flex-wrap: nowrap; gap: 8px; }
   .topbar:has(#user:not([hidden])) .brand,
   .topbar:has(#user:not([hidden])) .grow,
   .topbar:has(#user:not([hidden])) #sync,
   .topbar:has(#user:not([hidden])) #btn-theme { display: none; }
-  .topbar #roadmaps { flex: 1 1 0; min-width: 0; }
+  .topbar #roadmaps { flex: 1 1 0; min-width: 0; overflow: hidden; justify-content: center; }
+  /* only the open roadmap is shown, between ‹ › that switch roadmaps; "new roadmap" lives in the menu */
+  #roadmaps .rtab:not([aria-pressed="true"]), #roadmaps .rtab--add { display: none; }
+  #roadmaps .rtab[aria-pressed="true"] { flex: 1 1 auto; min-width: 0; justify-content: center; }
+  #roadmaps .rtab__name { overflow: hidden; text-overflow: ellipsis; }
+  .rtab-nav { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 36px; height: 36px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--muted); }
+  .rtab-nav:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
+  .rtab-nav:disabled { opacity: .4; }
   .user__btn { display: none; }
   .more-btn { display: inline-flex; }
   .user__item--m { display: flex; }

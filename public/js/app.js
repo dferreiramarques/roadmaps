@@ -642,7 +642,11 @@
 
   function renderSwitcher() {
     const box = $('#roadmaps');
+    const idx = roadmaps.findIndex(r => r.id === current);
+    // phones show only the open roadmap, with ‹ › to step between roadmaps (see the phone block in app.css)
+    const step = d => { const r = roadmaps[idx + d]; if (r) select(r.id); };
     box.replaceChildren(...[
+      el('button', { class: 'rtab-nav', 'aria-label': 'Previous roadmap', title: 'Previous roadmap', html: icon('left'), disabled: idx <= 0, onclick: () => step(-1) }),
       ...roadmaps.map(r => {
         const tab = el('button', { class: 'rtab', 'data-id': r.id, 'aria-pressed': String(r.id === current), title: (r.share ? 'Public' : 'Private') + ' — drag to reorder, right-click for the colour',
           onclick: () => { if (Date.now() < suppressTabClickUntil) return; select(r.id); } },
@@ -653,7 +657,8 @@
         tab.addEventListener('pointerdown', e => onTabPointerDown(e, r, tab));
         return tab;
       }),
-      el('button', { class: 'rtab rtab--add', title: 'New roadmap', 'aria-label': 'New roadmap', html: icon('plus'), onclick: () => roadmapDialog(null) })
+      el('button', { class: 'rtab rtab--add', title: 'New roadmap', 'aria-label': 'New roadmap', html: icon('plus'), onclick: () => roadmapDialog(null) }),
+      el('button', { class: 'rtab-nav', 'aria-label': 'Next roadmap', title: 'Next roadmap', html: icon('right'), disabled: idx >= roadmaps.length - 1, onclick: () => step(1) })
     ]);
     box.hidden = false;
     // keep the open roadmap's tab visible when the row scrolls sideways (phones)
@@ -889,7 +894,7 @@
   }
 
   // ── user menu, sync status, theme ───────────────────────────────────────────────────
-  // one menu, two buttons: the avatar on wide screens, the ⋮ button on phones (where everything but the tabs lives in it)
+  // one menu, two buttons: the avatar on wide screens, the ☰ button on phones (where everything but the open roadmap lives in it)
   const menu = $('#user-menu');
   const menuBtns = [$('#user-btn'), $('#more-btn')];
   const setMenu = open => { menu.hidden = !open; menuBtns.forEach(b => b.setAttribute('aria-expanded', String(open))); };
@@ -910,7 +915,7 @@
     const m = $('#sync-m');
     m.className = s.className;
     m.textContent = label;
-    $('#more-btn').dataset.sync = state;   // a dot on the ⋮ button when something needs attention
+    $('#more-btn').dataset.sync = state;   // a dot on the ☰ button when something needs attention
   }
 
   // ── backup ──────────────────────────────────────────────────────────────────────────
@@ -949,6 +954,7 @@
   });
 
   $('#btn-first').addEventListener('click', () => roadmapDialog(null));
+  $('#btn-new-m').addEventListener('click', () => { $('#user-menu').hidden = true; roadmapDialog(null); });
 
   // ── start ───────────────────────────────────────────────────────────────────────────
   RMSync.init({
