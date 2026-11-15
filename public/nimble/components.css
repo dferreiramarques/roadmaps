@@ -172,7 +172,7 @@ button { cursor: pointer; }
 .lp-hero h1 em { font-style: normal; color: var(--primary-fg); }
 .lp-hero p { margin: 18px auto 0; max-width: 56ch; color: var(--muted); font-size: 1.125rem; }
 .lp-cta { margin-top: 30px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-.lp-note { margin: 14px auto 0; color: var(--subtle); font-size: .8125rem; }
+.lp-hero .lp-note { margin: 14px auto 0; color: var(--subtle); font-size: .8125rem; }   /* beats .lp-hero p */
 .lp-sec { padding: 72px 0; }
 .lp-sec + .lp-sec { border-top: 1px solid var(--border); }
 .lp-head { max-width: 62ch; margin-bottom: 36px; }
@@ -191,7 +191,7 @@ button { cursor: pointer; }
 .steps { counter-reset: step; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 @media (max-width: 960px) { .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .steps { grid-template-columns: 1fr; } }
-.step { counter-increment: step; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 20px; }
+.step { counter-increment: step; position: relative; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 20px; }
 .step::before { content: counter(step); display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--primary); color: var(--primary-ink); font-weight: 700; font-size: .8125rem; margin-bottom: 12px; }
 .step h3 { font-size: 1rem; font-weight: 600; }
 .step p { margin-top: 4px; color: var(--muted); font-size: .875rem; }
