@@ -138,11 +138,7 @@
   function select(id) { current = id; RMSync.changed(); renderAll(); }
 
   // ── toast ───────────────────────────────────────────────────────────────────────────
-  function toast(msg, tone) {
-    const t = el('div', { class: 'toast' + (tone === 'warn' ? ' toast--warn' : ''), html: icon(tone === 'warn' ? 'x' : 'check') }, msg);
-    $('#toasts').append(t);
-    setTimeout(() => t.remove(), 3400);
-  }
+  function toast(msg, tone) { NimbleUI.toast(msg, { tone }); }
 
   async function copyText(text) {
     try { await navigator.clipboard.writeText(text); return true; } catch {}
@@ -159,38 +155,20 @@
 
   // ── dialogs ─────────────────────────────────────────────────────────────────────────
   function openDialog({ title, body, foot, onClose, wide }) {
-    const prev = document.activeElement;
-    const overlay = el('div', { class: 'overlay', role: 'presentation' });
-    const dlg = el('div', { class: 'dialog' + (wide ? ' dialog--wide' : ''), role: 'dialog', 'aria-modal': 'true', 'aria-label': title },
+    const overlay = el('div', { class: 'overlay', role: 'presentation', hidden: '' });
+    const dlg = el('div', { class: 'dialog' + (wide ? ' dialog--wide' : ''), 'aria-label': title },
       el('div', { class: 'dialog__head' },
         el('h2', { class: 'dialog__title' }, title),
-        el('button', { class: 'btn btn--text btn--icon btn--sm', 'aria-label': 'Close', html: icon('x'), onclick: () => close() })),
+        el('button', { class: 'btn btn--text btn--icon btn--sm', 'aria-label': 'Close', html: icon('x'), 'data-dialog-close': '' })),
       el('div', { class: 'dialog__body' }, body),
       el('div', { class: 'dialog__foot' }, foot));
     overlay.append(dlg);
     document.body.append(overlay);
-
-    const focusables = () => [...dlg.querySelectorAll('input, textarea, select, button:not([disabled])')];
-    const onKey = e => {
-      if (e.key === 'Escape') { e.stopPropagation(); close(); return; }
-      if (e.key !== 'Tab') return;
-      const f = focusables();
-      if (!f.length) return;
-      const first = f[0], last = f[f.length - 1];
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-    };
-    function close() {
-      if (!overlay.isConnected) return;
-      overlay.remove();
-      document.removeEventListener('keydown', onKey, true);
-      prev?.focus?.();
-      onClose?.();
-    }
-    document.addEventListener('keydown', onKey, true);
-    overlay.addEventListener('mousedown', e => { if (e.target === overlay) close(); });
-    (dlg.querySelector('input, textarea, select') || dlg.querySelector('.dialog__foot button:last-child'))?.focus();
-    return { close, dlg, body: dlg.querySelector('.dialog__body'), foot: dlg.querySelector('.dialog__foot') };
+    // focus: the first field, else the last footer button (not the close button)
+    (dlg.querySelector('input, textarea, select') || dlg.querySelector('.dialog__foot button:last-child'))?.setAttribute('autofocus', '');
+    overlay.addEventListener('nimble:dialogclose', () => { setTimeout(() => overlay.remove(), 0); onClose?.(); });
+    NimbleUI.dialog.open(overlay);
+    return { close: () => NimbleUI.dialog.close(overlay), dlg, body: dlg.querySelector('.dialog__body'), foot: dlg.querySelector('.dialog__foot') };
   }
 
   function confirmDialog({ title, message, confirm = 'Confirm', danger = false }) {
@@ -583,51 +561,23 @@
     focusCard(id);
   }
 
-  let drag = null;
-  let slot = null;
-  function dropIndex(list, y) {
-    const cards = [...list.querySelectorAll('.card:not(.dragging)')];
-    const i = cards.findIndex(c => { const r = c.getBoundingClientRect(); return y < r.top + r.height / 2; });
-    return i < 0 ? cards.length : i;
-  }
-  function placeSlot(list, idx) {
-    slot = slot || el('div', { class: 'drop-slot' });
-    const cards = [...list.querySelectorAll('.card:not(.dragging)')];
-    if (idx < cards.length) list.insertBefore(slot, cards[idx]); else list.append(slot);
-  }
-  function endDrag() {
-    drag = null;
-    slot?.remove();
-    slot = null;
-    document.querySelectorAll('.col.over').forEach(c => c.classList.remove('over'));
-    document.querySelectorAll('.card.dragging').forEach(c => c.classList.remove('dragging'));
-  }
-  function wireDrop(col, list, colId) {
-    col.addEventListener('dragover', e => {
-      if (!drag) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      document.querySelectorAll('.col.over').forEach(c => { if (c !== col) c.classList.remove('over'); });
-      col.classList.add('over');
-      placeSlot(list, dropIndex(list, e.clientY));
-    });
-    col.addEventListener('dragleave', e => { if (!col.contains(e.relatedTarget)) { col.classList.remove('over'); slot?.remove(); } });
-    col.addEventListener('drop', e => {
-      if (!drag) return;
-      e.preventDefault();
-      const idx = dropIndex(list, e.clientY);
-      const id = drag.id;
-      endDrag();
-      moveItem(id, colId, idx);
-    });
-  }
+  // drag & keyboard sorting: nimble behaviors (data-sortable). Cards move between the three lists; the event says where.
+  document.addEventListener('nimble:sort', e => {
+    const { item, to, newIndex } = e.detail;
+    if (to.id === 'roadmaps') { reorderRoadmap(item.dataset.id, newIndex); return; }
+    const colId = to.closest('.col')?.dataset.col;
+    if (!colId || !item.dataset.id) return;
+    const wasFocused = document.activeElement === item;
+    moveItem(item.dataset.id, colId, newIndex);
+    if (wasFocused) focusCard(item.dataset.id);
+  });
 
   // ── rendering ───────────────────────────────────────────────────────────────────────
   const tagEl = it => (it.tag ? el('span', { class: 'tag', 'data-tone': it.tone }, it.tag) : null);
 
   function cardEl(it, colId) {
     const ci = COLS.findIndex(c => c.id === colId);
-    const card = el('article', { class: 'card', 'data-id': it.id, role: 'listitem', tabindex: '0' },
+    const card = el('article', { class: 'card', 'data-id': it.id, 'data-sortable-item': '', role: 'listitem', tabindex: '0' },
       el('h3', { class: 'card__title' }, it.title),
       it.description && el('p', { class: 'card__desc' }, it.description),
       el('div', { class: 'card__foot' },
@@ -639,14 +589,6 @@
           el('button', { class: 'btn btn--text btn--icon btn--sm', title: 'Mark shipped', 'aria-label': 'Mark shipped', html: icon('flag'), onclick: () => shipDialog(it) }),
           el('button', { class: 'btn btn--text btn--icon btn--sm', title: 'Edit', 'aria-label': 'Edit', html: icon('pencil'), onclick: () => itemDialog(it, colId) }),
           el('button', { class: 'btn btn--text btn--icon btn--sm btn--del', title: 'Delete', 'aria-label': 'Delete', html: icon('trash'), onclick: () => deleteItem(it.id) }))));
-    card.draggable = true;
-    card.addEventListener('dragstart', e => {
-      drag = { id: it.id };
-      e.dataTransfer.effectAllowed = 'move';
-      try { e.dataTransfer.setData('text/plain', it.id); } catch {}
-      setTimeout(() => card.classList.add('dragging'), 0);
-    });
-    card.addEventListener('dragend', endDrag);
     card.addEventListener('keydown', e => {
       if (e.target !== card) return;
       if (e.altKey && e.key === 'ArrowUp')         { e.preventDefault(); moveByKey(it.id, 0, -1); }
@@ -668,13 +610,12 @@
     box.replaceChildren(...[
       el('button', { class: 'rtab-nav', 'aria-label': 'Previous roadmap', title: 'Previous roadmap', html: icon('left'), disabled: idx <= 0, onclick: () => step(-1) }),
       ...roadmaps.map(r => {
-        const tab = el('button', { class: 'rtab', 'data-id': r.id, 'aria-pressed': String(r.id === current), title: (r.share ? 'Public' : 'Private') + ' — drag to reorder, right-click for the colour',
+        const tab = el('button', { class: 'rtab', 'data-id': r.id, 'data-sortable-item': '', 'aria-pressed': String(r.id === current), title: (r.share ? 'Public' : 'Private') + ' — drag to reorder, right-click for the colour',
           onclick: () => { if (Date.now() < suppressTabClickUntil) return; select(r.id); } },
           el('span', { class: 'rtab__vis', html: icon(r.share ? 'rocket' : 'lock') }), el('span', { class: 'rtab__name' }, r.name));
         tab.style.setProperty('--tab-color', colorOf(r));
-        if (tabDrag && tabDrag.active && tabDrag.id === r.id) tab.classList.add('dragging-source');
         tab.addEventListener('contextmenu', e => { e.preventDefault(); openColorMenu(r, e.clientX, e.clientY); });
-        tab.addEventListener('pointerdown', e => onTabPointerDown(e, r, tab));
+        tab.addEventListener('pointerdown', e => onTabPress(e, r));
         return tab;
       }),
       el('button', { class: 'rtab rtab--add', title: 'New roadmap', 'aria-label': 'New roadmap', html: icon('plus'), onclick: () => roadmapDialog(null) }),
@@ -683,7 +624,7 @@
     box.hidden = false;
     // keep the open roadmap's tab visible when the row scrolls sideways (phones)
     const active = box.querySelector('.rtab[aria-pressed="true"]');
-    if (active && !(tabDrag && tabDrag.active)) {
+    if (active) {
       const b = box.getBoundingClientRect(), t = active.getBoundingClientRect();
       if (t.left < b.left) box.scrollLeft -= b.left - t.left + 8;
       else if (t.right > b.right) box.scrollLeft += t.right - b.right + 8;
@@ -734,91 +675,17 @@
     window.addEventListener('resize', closeColorMenu);
   }
 
-  // ── tab drag to reorder (pointer based: mouse and touch; a long-press on touch opens the colour menu) ──
-  let tabDrag = null;
+  // ── tabs: reorder = nimble sortable (axis x, set on #roadmaps in app.html); a still long-press on touch opens the colour menu ──
   let suppressTabClickUntil = 0;
-
-  function onTabPointerDown(e, r, tabEl) {
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    tabDrag = { id: r.id, tabEl, startX: e.clientX, startY: e.clientY, active: false, insertIdx: null };
-    if (e.pointerType === 'touch') {
-      tabDrag.pressTimer = setTimeout(() => {
-        if (!tabDrag || tabDrag.active) return;
-        const { startX, startY } = tabDrag;
-        endTabDrag();
-        suppressTabClickUntil = Date.now() + 500;
-        openColorMenu(r, startX, startY);
-      }, 550);
-    }
-    document.addEventListener('pointermove', onTabPointerMove);
-    document.addEventListener('pointerup', onTabPointerUp);
-    document.addEventListener('pointercancel', onTabPointerUp);
-  }
-
-  function onTabPointerMove(e) {
-    const d = tabDrag;
-    if (!d) return;
-    if (!d.active) {
-      if (Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < 6) return;
-      clearTimeout(d.pressTimer);
-      if (roadmaps.length < 2) { endTabDrag(); return; }
-      d.active = true;
-      const rect = d.tabEl.getBoundingClientRect();
-      d.grabDX = d.startX - rect.left;
-      d.ghost = d.tabEl.cloneNode(true);
-      d.ghost.classList.add('rtab-ghost');
-      d.ghost.style.width = rect.width + 'px';
-      d.ghost.style.height = rect.height + 'px';
-      document.body.append(d.ghost);
-      d.marker = el('div', { class: 'rtab-marker' });
-      document.body.append(d.marker);
-      d.tabEl.classList.add('dragging-source');
-      document.body.classList.add('tab-dragging');
-    }
-    e.preventDefault();
-    const bar = $('#roadmaps').getBoundingClientRect();
-    d.ghost.style.left = (e.clientX - d.grabDX) + 'px';
-    d.ghost.style.top = bar.top + 'px';
-
-    // where would it land? (index in the list without the dragged roadmap)
-    const others = [...document.querySelectorAll('#roadmaps .rtab:not(.rtab--add)')].filter(t => t.dataset.id !== d.id);
-    const inBar = e.clientY > bar.top - 50 && e.clientY < bar.bottom + 50;     // let go far away = cancel
-    if (!inBar || !others.length) { d.insertIdx = inBar ? roadmaps.findIndex(x => x.id === d.id) : null; d.marker.style.display = 'none'; return; }
-    let k = 0;
-    while (k < others.length) { const rr = others[k].getBoundingClientRect(); if (e.clientX < rr.left + rr.width / 2) break; k++; }
-    const rest = roadmaps.filter(x => x.id !== d.id);
-    const ref = k < others.length ? others[k] : others[others.length - 1];
-    const refIdx = rest.findIndex(x => x.id === ref.dataset.id);
-    d.insertIdx = k < others.length ? refIdx : refIdx + 1;
-    const rr = ref.getBoundingClientRect();
-    d.marker.style.left = ((k < others.length ? rr.left : rr.right) - 4) + 'px';
-    d.marker.style.top = rr.top + 'px';
-    d.marker.style.height = rr.height + 'px';
-    d.marker.style.display = 'block';
-  }
-
-  function endTabDrag() {
-    const d = tabDrag;
-    if (!d) return;
-    clearTimeout(d.pressTimer);
-    d.ghost?.remove();
-    d.marker?.remove();
-    document.body.classList.remove('tab-dragging');
-    document.querySelectorAll('.rtab.dragging-source').forEach(t => t.classList.remove('dragging-source'));
-    document.removeEventListener('pointermove', onTabPointerMove);
-    document.removeEventListener('pointerup', onTabPointerUp);
-    document.removeEventListener('pointercancel', onTabPointerUp);
-    tabDrag = null;
-  }
-
-  function onTabPointerUp(e) {
-    const d = tabDrag;
-    if (!d) return;
-    const commit = d.active && e.type === 'pointerup' && d.insertIdx != null;
-    const { id, insertIdx, active } = d;
-    endTabDrag();
-    if (active) suppressTabClickUntil = Date.now() + 400;      // the drop must not also select the tab
-    if (commit) reorderRoadmap(id, insertIdx);
+  function onTabPress(e, r) {
+    if (e.pointerType !== 'touch') return;
+    const x = e.clientX, y = e.clientY;
+    const stop = () => { clearTimeout(timer); document.removeEventListener('pointermove', onMove, true); document.removeEventListener('pointerup', stop, true); document.removeEventListener('pointercancel', stop, true); };
+    const onMove = ev => { if (Math.hypot(ev.clientX - x, ev.clientY - y) > 6) stop(); };
+    const timer = setTimeout(() => { stop(); suppressTabClickUntil = Date.now() + 500; openColorMenu(r, x, y); }, 550);
+    document.addEventListener('pointermove', onMove, true);
+    document.addEventListener('pointerup', stop, true);
+    document.addEventListener('pointercancel', stop, true);
   }
 
   function reorderRoadmap(id, toIndex) {
@@ -854,7 +721,7 @@
     root.replaceChildren();
     for (const c of COLS) {
       const items = r[c.id];
-      const list = el('div', { class: 'col__list', role: 'list' });
+      const list = el('div', { class: 'col__list', role: 'list', 'data-sortable': '', 'data-sortable-group': 'cards' });
       items.forEach(it => list.append(cardEl(it, c.id)));
       if (!items.length) list.append(el('div', { class: 'empty' }, 'Nothing here yet.', el('button', { class: 'btn btn--outline btn--sm', html: icon('plus') + ' Add feature', onclick: () => itemDialog(null, c.id) })));
       const col = el('section', { class: 'col', 'data-col': c.id },
@@ -862,7 +729,6 @@
           el('span', { class: 'col__dot' }), el('span', { class: 'col__title' }, c.label), el('span', { class: 'col__sub' }, c.sub), el('span', { class: 'col__count' }, String(items.length)),
           el('button', { class: 'btn btn--text btn--icon btn--sm col__add', title: `Add to ${c.label}`, 'aria-label': `Add to ${c.label}`, html: icon('plus'), onclick: () => itemDialog(null, c.id) })),
         list);
-      wireDrop(col, list, c.id);
       root.append(col);
     }
   }
@@ -914,40 +780,32 @@
   }
 
   // ── user menu, sync status, theme ───────────────────────────────────────────────────
-  // one menu, two buttons: the avatar on wide screens, the ☰ button on phones (where everything but the open roadmap lives in it)
-  const menu = $('#user-menu');
-  const menuBtns = [$('#user-btn'), $('#more-btn')];
-  const setMenu = open => { menu.hidden = !open; menuBtns.forEach(b => b.setAttribute('aria-expanded', String(open))); };
-  menuBtns.forEach(b => b.addEventListener('click', e => { e.stopPropagation(); setMenu(menu.hidden); }));
-  document.addEventListener('click', e => { if (!e.target.closest('#user')) setMenu(false); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') setMenu(false); });
-
+  // one menu (nimble .menu, opened by [data-menu-toggle]), two buttons: the avatar on wide screens, the ☰ button on phones (where everything but the open roadmap lives in it)
   $('#btn-signout').addEventListener('click', async () => {
-    setMenu(false);
     if (await RMSync.signOut()) { roadmaps = []; current = ''; showGate('You are signed out.'); }
   });
 
   function setStatus(state, label) {
     const s = $('#sync');
     s.hidden = false;
-    s.className = 'chip ' + (state === 'synced' ? 'chip--ok' : state === 'syncing' ? 'chip--info' : state === 'error' ? 'chip--danger' : 'chip--muted');
+    const st = state === 'synced' ? 'saved' : state === 'syncing' ? 'saving' : state === 'error' ? 'error' : 'offline';
+    s.dataset.state = st;
     s.textContent = label;
     const m = $('#sync-m');
-    m.className = s.className;
+    m.dataset.state = st;
     m.textContent = label;
     $('#more-btn').dataset.sync = state;   // a dot on the ☰ button when something needs attention
   }
 
   // ── backup ──────────────────────────────────────────────────────────────────────────
   $('#btn-export').addEventListener('click', () => {
-    setMenu(false);
     const url = URL.createObjectURL(new Blob([JSON.stringify({ app: 'roadmaps', version: 1, current, roadmaps }, null, 2) + '\n'], { type: 'application/json' }));
     const a = el('a', { href: url, download: `roadmaps-backup-${new Date().toISOString().slice(0, 10)}.json` });
     document.body.append(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     toast('Backup downloaded');
   });
-  $('#btn-import').addEventListener('click', () => { setMenu(false); $('#file').click(); });
+  $('#btn-import').addEventListener('click', () => { $('#file').click(); });
   $('#file').addEventListener('change', async e => {
     const f = e.target.files[0];
     e.target.value = '';
@@ -983,7 +841,7 @@
   });
 
   $('#btn-first').addEventListener('click', () => roadmapDialog(null));
-  $('#btn-new-m').addEventListener('click', () => { $('#user-menu').hidden = true; roadmapDialog(null); });
+  $('#btn-new-m').addEventListener('click', () => roadmapDialog(null));
 
   // ── start ───────────────────────────────────────────────────────────────────────────
   RMSync.init({

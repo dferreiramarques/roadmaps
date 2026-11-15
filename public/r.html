@@ -5,10 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Roadmap</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-  <script src="/js/theme.js"></script>
+  <meta name="nimble-theme-key" content="roadmaps-theme" />
+  <script src="/nimble/theme.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/nimble/tokens.css" />
+  <link rel="stylesheet" href="/nimble/components.css" />
   <link rel="stylesheet" href="/app.css" />
 </head>
 <body>
@@ -22,7 +25,7 @@
       </a>
       <span class="grow"></span>
       <a class="btn btn--outline btn--sm" href="/">Make your own</a>
-      <button class="btn btn--text btn--icon" id="btn-theme" aria-label="Toggle light / dark theme" title="Toggle theme"></button>
+      <button class="btn btn--text btn--icon" id="btn-theme" data-theme-toggle data-theme-icon aria-label="Toggle light / dark theme" title="Toggle theme"></button>
     </div>
   </header>
 
