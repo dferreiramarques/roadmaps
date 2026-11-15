@@ -156,6 +156,8 @@ button { cursor: pointer; }
 .dialog__body { padding: 16px 24px 4px; display: flex; flex-direction: column; gap: 16px; }
 .dialog__msg { color: var(--muted); font-size: .9375rem; }
 .dialog__foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding: 20px 24px 24px; }
+.dialog__foot .btn--del-left { margin-right: auto; }   /* destructive action on the left of the footer */
+@media (max-width: 520px) { .dialog__foot .btn--del-left { flex-basis: 100%; justify-content: flex-start; margin-right: 0; } }
 
 /* ── Toast ───────────────────────────────────────────────────────────────── */
 .toasts { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 200; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }

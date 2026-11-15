@@ -419,9 +419,9 @@
     const d = openDialog({
       title: isNew ? 'Add feature' : 'Edit feature',
       body: [
-        field('Title', title), field('Description', desc),
-        el('div', { class: 'row2' }, field('Tag', tag, 'A short label on the card.'), el('div', { class: 'field' }, el('span', { class: 'lbl' }, 'Column'), colSeg)),
-        field('When (optional)', when, 'A rough timing, not a promise: “Q1 2027”, “Dec”.'),
+        el('div', { class: 'row2 row2--auto' }, field('Title', title), el('div', { class: 'field' }, el('span', { class: 'lbl' }, 'Column'), colSeg)),
+        field('Description', desc),
+        el('div', { class: 'row2' }, field('Tag', tag, 'A short label on the card.'), field('When (optional)', when, 'Rough timing: “Q1 2027”, “Dec”.')),
         pick && el('div', { class: 'field' }, el('span', { class: 'lbl' }, 'Labels already in this roadmap'), pick),
         el('div', { class: 'field' }, el('span', { class: 'lbl' }, 'Tag colour'), tones)
       ],

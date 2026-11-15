@@ -129,6 +129,15 @@ a.menu__item { color: inherit; text-decoration: none; }
 .color-menu__custom { display: flex; align-items: center; gap: 8px; font-size: .8125rem; color: var(--muted); }
 .color-menu__custom input { width: 32px; height: 26px; padding: 0; border: 1px solid var(--border-strong); border-radius: 4px; background: none; cursor: pointer; }
 
+/* feature dialog: title + column on one row, so the dialog fits short screens without scrolling */
+.row2--auto { grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+@media (max-width: 520px) { .row2--auto { grid-template-columns: 1fr; } }
+
+/* tag colour picker (feature dialog): each option wraps a .tag */
+.tones { display: flex; flex-wrap: wrap; gap: 8px; }
+.tone-opt { border: 2px solid transparent; border-radius: calc(var(--r-sm) + 2px); background: none; padding: 1px; }
+.tone-opt[aria-pressed="true"] { border-color: var(--primary); }
+
 /* labels already used in a roadmap (feature dialog) */
 .tagpick { display: flex; flex-wrap: wrap; gap: 6px; }
 .tag--btn { border: 0; cursor: pointer; font-family: inherit; transition: filter var(--fast), box-shadow var(--fast); }
