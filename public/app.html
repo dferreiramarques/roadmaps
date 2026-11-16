@@ -6,10 +6,13 @@
   <meta name="robots" content="noindex" />
   <title>Roadmaps</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-  <script src="/js/theme.js"></script>
+  <meta name="nimble-theme-key" content="roadmaps-theme" />
+  <script src="/nimble/theme.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/nimble/tokens.css" />
+  <link rel="stylesheet" href="/nimble/components.css" />
   <link rel="stylesheet" href="/app.css" />
 </head>
 <body>
@@ -22,32 +25,32 @@
         Roadmaps
       </a>
 
-      <div class="rtabs" id="roadmaps" role="group" aria-label="Your roadmaps" hidden></div>
+      <div class="rtabs" id="roadmaps" role="group" aria-label="Your roadmaps" data-sortable data-sortable-group="tabs" data-sortable-axis="x" data-sortable-keyboard="off" hidden></div>
 
       <span class="grow"></span>
 
-      <span class="chip chip--muted" id="sync" hidden>Offline</span>
-      <button class="btn btn--text btn--icon" id="btn-theme" data-theme-toggle aria-label="Toggle light / dark theme" title="Toggle theme"></button>
+      <span class="sync" id="sync" data-state="offline" hidden>Offline</span>
+      <button class="btn btn--text btn--icon" id="btn-theme" data-theme-toggle data-theme-icon aria-label="Toggle light / dark theme" title="Toggle theme"></button>
 
       <div class="user" id="user" hidden>
-        <button class="user__btn" id="user-btn" aria-haspopup="true" aria-expanded="false">
+        <button class="user__btn" id="user-btn" data-menu-toggle="#user-menu" aria-haspopup="menu" aria-expanded="false">
           <img class="user__avatar" id="user-avatar" alt="" referrerpolicy="no-referrer" />
           <span class="user__name" id="user-name"></span>
         </button>
-        <button class="btn btn--text btn--icon more-btn" id="more-btn" aria-haspopup="true" aria-expanded="false" aria-label="Menu" title="Menu">
+        <button class="btn btn--text btn--icon more-btn" id="more-btn" data-menu-toggle="#user-menu" aria-haspopup="menu" aria-expanded="false" aria-label="Menu" title="Menu">
           <svg class="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         </button>
-        <div class="user__menu" id="user-menu" hidden>
+        <div class="menu menu--end" id="user-menu" role="menu" hidden>
           <div class="user__email" id="user-email"></div>
-          <button class="user__item user__item--m" id="btn-new-m">New roadmap</button>
-          <a class="user__item user__item--m" href="/">About Roadmaps</a>
-          <div class="user__item user__item--m user__row"><span>Sync</span><span class="chip chip--muted" id="sync-m">Offline</span></div>
-          <button class="user__item user__item--m user__row" id="btn-theme-m" data-theme-toggle><span>Light / dark theme</span><span class="theme-ico"></span></button>
-          <div class="user__sep user__sep--m"></div>
-          <button class="user__item" id="btn-export">Export backup (.json)</button>
-          <button class="user__item" id="btn-import">Import backup…</button>
-          <div class="user__sep"></div>
-          <button class="user__item" id="btn-signout">Sign out</button>
+          <button class="menu__item menu__item--m" role="menuitem" id="btn-new-m">New roadmap</button>
+          <a class="menu__item menu__item--m" role="menuitem" href="/">About Roadmaps</a>
+          <div class="menu__row menu__item--m"><span>Sync</span><span class="sync" id="sync-m" data-state="offline">Offline</span></div>
+          <button class="menu__item menu__item--m menu__row" role="menuitem" id="btn-theme-m" data-theme-toggle data-theme-icon><span>Light / dark theme</span><span class="theme-ico"></span></button>
+          <div class="menu__sep menu__sep--m"></div>
+          <button class="menu__item" role="menuitem" id="btn-export">Export backup (.json)</button>
+          <button class="menu__item" role="menuitem" id="btn-import">Import backup…</button>
+          <div class="menu__sep"></div>
+          <button class="menu__item" role="menuitem" id="btn-signout">Sign out</button>
         </div>
       </div>
     </div>
@@ -84,6 +87,7 @@
   <div class="toasts" id="toasts" aria-live="polite"></div>
   <input type="file" id="file" accept="application/json,.json" hidden />
 
+  <script src="/nimble/behaviors.js"></script>
   <script src="/js/sync.js"></script>
   <script src="/js/app.js"></script>
 </body>

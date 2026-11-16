@@ -216,7 +216,7 @@ test('pages, assets and security headers', async () => {
   const s = await listen(createApp({ env: {} }));
   try {
     assert.equal((await (await fetch(s.base + '/healthz')).json()).ok, true);
-    for (const p of ['/', '/app', '/r/abcdefghij', '/privacy', '/terms', '/favicon.svg', '/app.css', '/product-page.css', '/js/app.js', '/js/sync.js']) assert.equal((await fetch(s.base + p)).status, 200, p);
+    for (const p of ['/', '/app', '/r/abcdefghij', '/privacy', '/terms', '/favicon.svg', '/app.css', '/nimble/tokens.css', '/nimble/components.css', '/nimble/theme.js', '/nimble/behaviors.js', '/js/app.js', '/js/sync.js']) assert.equal((await fetch(s.base + p)).status, 200, p);
     const landing = await (await fetch(s.base + '/')).text();
     assert.match(landing, /now, next and later/);
     assert.ok(!/style="/.test(landing) && !/<script>/.test(landing), 'no inline styles or scripts (the CSP forbids them)');
@@ -231,12 +231,26 @@ test('pages, assets and security headers', async () => {
   } finally { await s.close(); }
 });
 
-test('product-page.css (copied into the Taskboards and Diagramico repos) still matches the landing rules in app.css', () => {
+test('the nimbleUI kit (public/nimble, copied from the nimbleui-design-system repo) keeps themes colour-only', () => {
   const read = f => fs.readFileSync(path.join(__dirname, '..', 'public', f), 'utf8').replace(/\r\n/g, '\n');
-  const marker = '/* ── product page (landing)';
-  const landing = read('app.css').slice(read('app.css').indexOf(marker));
-  assert.ok(landing.length > 500);
-  assert.ok(read('product-page.css').includes(landing), 'regenerate product-page.css from app.css and copy it to the other repos');
+  const tokens = read('nimble/tokens.css').replace(/\/\*[\s\S]*?\*\//g, '');
+  // every [data-theme...] block may only declare custom properties and colour-scheme (sizes, spacing, radii, shadow geometry live in :root)
+  const blocks = [...tokens.matchAll(/\[data-theme[^{]*\{([^}]*)\}/g)];
+  assert.ok(blocks.length >= 4);
+  for (const [, body] of blocks) {
+    for (const decl of body.split(';').map(x => x.trim()).filter(Boolean)) {
+      assert.match(decl, /^(--[a-z0-9-]+|color-scheme)\s*:/, 'non-colour declaration inside a theme block: ' + decl);
+    }
+  }
+  // app.css must not redefine theme tokens or restyle components per theme
+  const app = read('app.css').replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const [, body] of app.matchAll(/\[data-theme[^{]*\{([^}]*)\}/g)) assert.match(body, /^\s*(color|background|border-color|fill|stroke|box-shadow)[^;]*;\s*$/, 'app.css has a non-colour rule under [data-theme]');
+  for (const f of ['index.html', 'app.html', 'r.html', 'privacy.html', 'terms.html']) {
+    const html = read(f);
+    assert.ok(html.includes('/nimble/tokens.css') && html.includes('/nimble/components.css') && html.includes('/nimble/theme.js'), f + ' must load the nimble kit');
+    assert.ok(!/ style=/.test(html), f + ' has an inline style attribute');
+  }
+  assert.ok(read('app.html').includes('/nimble/behaviors.js'));
 });
 
 test('/r/:id/feed.atom serves an Atom feed of a shared roadmap, one entry per publication', async () => {
