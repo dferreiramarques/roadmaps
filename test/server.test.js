@@ -216,7 +216,7 @@ test('pages, assets and security headers', async () => {
   const s = await listen(createApp({ env: {} }));
   try {
     assert.equal((await (await fetch(s.base + '/healthz')).json()).ok, true);
-    for (const p of ['/', '/app', '/r/abcdefghij', '/privacy', '/terms', '/favicon.svg', '/manifest.webmanifest', '/app.css', '/nimble/tokens.css', '/nimble/components.css', '/nimble/theme.js', '/nimble/behaviors.js', '/js/app.js', '/js/sync.js']) assert.equal((await fetch(s.base + p)).status, 200, p);
+    for (const p of ['/', '/app', '/r/abcdefghij', '/privacy', '/terms', '/favicon.svg', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/apple-touch-icon.png', '/app.css', '/nimble/tokens.css', '/nimble/components.css', '/nimble/theme.js', '/nimble/behaviors.js', '/js/app.js', '/js/sync.js']) assert.equal((await fetch(s.base + p)).status, 200, p);
     const landing = await (await fetch(s.base + '/')).text();
     assert.match(landing, /now, next and later/);
     assert.ok(!/style="/.test(landing) && !/<script>/.test(landing), 'no inline styles or scripts (the CSP forbids them)');
