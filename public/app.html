@@ -6,6 +6,7 @@
   <meta name="robots" content="noindex" />
   <title>Roadmaps</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="nimble-theme-key" content="roadmaps-theme" />
   <script src="/nimble/theme.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -30,6 +31,7 @@
       <span class="grow"></span>
 
       <span class="sync" id="sync" data-state="offline" hidden>Offline</span>
+      <button class="btn btn--text btn--icon" id="btn-install" data-install hidden></button>
       <button class="btn btn--text btn--icon help-btn" id="btn-help" aria-label="How it works" title="How it works">?</button>
       <button class="btn btn--text btn--icon" id="btn-theme" data-theme-toggle data-theme-icon aria-label="Toggle light / dark theme" title="Toggle theme"></button>
 
@@ -50,6 +52,7 @@
           <div class="menu__sep menu__sep--m"></div>
           <button class="menu__item" role="menuitem" id="btn-export">Export backup (.json)</button>
           <button class="menu__item" role="menuitem" id="btn-import">Import backup…</button>
+          <button class="menu__item menu__item--m menu__row" role="menuitem" id="btn-install-m" data-install hidden><span>Install app</span><span class="install-ico"></span></button>
           <button class="menu__item menu__item--m" role="menuitem" id="btn-help-m">How it works</button>
           <div class="menu__sep"></div>
           <button class="menu__item" role="menuitem" id="btn-signout">Sign out</button>

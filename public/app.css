@@ -82,7 +82,8 @@ a.menu__item { color: inherit; text-decoration: none; }
   .topbar:has(#user:not([hidden])) .grow,
   .topbar:has(#user:not([hidden])) #sync,
   .topbar:has(#user:not([hidden])) #btn-theme,
-  .topbar:has(#user:not([hidden])) #btn-help { display: none; }
+  .topbar:has(#user:not([hidden])) #btn-help,
+  .topbar:has(#user:not([hidden])) #btn-install { display: none; }
   .topbar #roadmaps { flex: 1 1 0; min-width: 0; overflow: hidden; justify-content: center; }
   /* only the open roadmap is shown, between ‹ › that switch roadmaps; "new roadmap" lives in the menu */
   #roadmaps .rtab:not([aria-pressed="true"]), #roadmaps .rtab--add { display: none; }
