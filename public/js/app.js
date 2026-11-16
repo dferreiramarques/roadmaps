@@ -840,6 +840,31 @@
     } catch { toast('That file isn’t a valid Roadmaps backup', 'warn'); }
   });
 
+  // ── help: how the app works + shortcuts ──
+  function helpDialog() {
+    const row = (mark, ...kids) => el('div', { class: 'help__row' }, el('span', { class: 'help__icon' }, mark), el('div', {}, ...kids));
+    const b = t => el('strong', {}, t);
+    const k = t => el('kbd', {}, t);
+    const d = openDialog({
+      title: 'How it works',
+      body: [
+        el('div', { class: 'help__section' },
+          row('◔', b('Now · Next · Later'), ' — what you are working on, what is coming and what is further out. Drag a card to another column to move it.'),
+          row('✦', b('New card'), ' — the + button at the top of a column. Click a card, or press ', k('Enter'), ' on it, to edit it; the pencil, flag and bin on a card edit, mark it shipped or delete it.'),
+          row('⊞', b('Several roadmaps'), ' — one tab per product. Drag a tab to reorder it, right-click it (long-press on a phone) to change its colour, use ‹ › on a phone to switch.')),
+        el('div', { class: 'help__divider' }),
+        el('div', { class: 'help__section' },
+          row('⇄', b('Keyboard'), ' — focus a card, then ', k('Alt'), ' + arrows move it, ', k('Enter'), ' edits, ', k('S'), ' marks it shipped, ', k('Delete'), ' removes it.'),
+          row('◉', b('Private or public'), ' — every roadmap starts private. ', b('Share'), ' makes it public and gives you a page and an embed snippet; make it private again to switch both off.'),
+          row('☁\uFE0E', b('Your Google Drive'), ' — roadmaps are saved to a private folder in your own Drive. The server keeps no copy. It keeps working offline and syncs when you are back; the chip at the top shows the state.'))
+      ],
+      foot: [el('button', { class: 'btn btn--primary', 'data-dialog-close': '' }, 'Got it')]
+    });
+    return d;
+  }
+  $('#btn-help').addEventListener('click', helpDialog);
+  $('#btn-help-m').addEventListener('click', helpDialog);
+
   $('#btn-first').addEventListener('click', () => roadmapDialog(null));
   $('#btn-new-m').addEventListener('click', () => roadmapDialog(null));
 

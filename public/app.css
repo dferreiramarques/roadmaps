@@ -81,7 +81,8 @@ a.menu__item { color: inherit; text-decoration: none; }
   .topbar:has(#user:not([hidden])) .brand,
   .topbar:has(#user:not([hidden])) .grow,
   .topbar:has(#user:not([hidden])) #sync,
-  .topbar:has(#user:not([hidden])) #btn-theme { display: none; }
+  .topbar:has(#user:not([hidden])) #btn-theme,
+  .topbar:has(#user:not([hidden])) #btn-help { display: none; }
   .topbar #roadmaps { flex: 1 1 0; min-width: 0; overflow: hidden; justify-content: center; }
   /* only the open roadmap is shown, between ‹ › that switch roadmaps; "new roadmap" lives in the menu */
   #roadmaps .rtab:not([aria-pressed="true"]), #roadmaps .rtab--add { display: none; }
@@ -210,3 +211,13 @@ body.readonly .only-edit { display: none !important; }
 /* ── product page (landing): extras on top of nimble/components.css ───────── */
 .note { padding: 0 0 40px; color: var(--subtle); font-size: .8125rem; }
 .note code { font-family: var(--mono); font-size: .75rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; }
+
+/* ── help dialog + "?" button ── */
+.help-btn { font-weight: 600; font-size: 15px; }
+.help__section { display: flex; flex-direction: column; gap: 12px; }
+.help__row { display: flex; align-items: flex-start; gap: 12px; font-size: 13px; line-height: 1.5; color: var(--muted); }
+.help__row > div { min-width: 0; overflow-wrap: anywhere; }
+.help__row strong { color: var(--text); font-weight: 600; }
+.help__icon { flex: none; width: 20px; text-align: center; color: var(--primary); font-size: 15px; line-height: 1.4; }
+.help__divider { height: 1px; background: var(--border); }
+kbd { font-family: var(--mono, 'JetBrains Mono', monospace); font-size: 11px; padding: 1px 5px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-2); color: var(--text); }
