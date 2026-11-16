@@ -221,3 +221,6 @@ body.readonly .only-edit { display: none !important; }
 .help__icon { flex: none; width: 20px; text-align: center; color: var(--primary); font-size: 15px; line-height: 1.4; }
 .help__divider { height: 1px; background: var(--border); }
 kbd { font-family: var(--mono, 'JetBrains Mono', monospace); font-size: 11px; padding: 1px 5px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-2); color: var(--text); }
+
+/* keep the layout still when a long roadmap shows the page scrollbar (it would shift everything ~7px) */
+html { scrollbar-gutter: stable; }
