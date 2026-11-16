@@ -10,6 +10,7 @@
    Edit      [data-editable][="multiline"][data-maxlength][data-allow-empty]  dblclick / Enter / F2, or [data-edit-trigger="#id"]
              Enter saves (multiline: Ctrl/Cmd+Enter) · Esc cancels · blur saves · event nimble:edit {value, oldValue} (cancelable)
    Dialog    [data-dialog-open="#id"], [data-dialog-close][data-dialog-result], overlay = .overlay[hidden] > .dialog
+             (or your own classes: overlay[data-dialog-overlay][hidden] > [data-dialog-panel])
              focus trap, Esc / backdrop close ([data-static] disables), focus returns to opener; events nimble:dialogopen/-close
    Confirm   NimbleUI.confirm({title, message, confirmLabel, cancelLabel, danger}) -> Promise<boolean>
    Menu      [data-menu-toggle="#id"] + .menu[hidden] > [role=menuitem]; arrows/Home/End/Esc; event nimble:menuselect {item, value}
@@ -298,10 +299,10 @@
   });
 
   /* ═════════════ Dialog ═════════════ */
-  var stack = [];
+  var stack = [], OVERLAY = '.overlay,[data-dialog-overlay]', PANEL = '.dialog,[data-dialog-panel]';   // data-dialog-* = an app's own overlay/panel classes
   function openDialog(ov, opener) {
     if (!ov || !ov.hidden) return;
-    var dlg = $('.dialog', ov) || ov, title = $('.dialog__title', dlg);
+    var dlg = $(PANEL, ov) || ov, title = $('.dialog__title', dlg);
     dlg.setAttribute('role', dlg.getAttribute('role') || 'dialog');
     dlg.setAttribute('aria-modal', 'true');
     if (title) dlg.setAttribute('aria-labelledby', ensureId(title, 'dt'));
@@ -329,7 +330,7 @@
     var o = e.target.closest && e.target.closest('[data-dialog-open]');
     if (o) { openDialog($(o.getAttribute('data-dialog-open')), o); return; }
     var c = e.target.closest && e.target.closest('[data-dialog-close]');
-    if (c) { var ov = c.closest('.overlay'); if (ov) closeDialog(ov, c.getAttribute('data-dialog-result') || undefined); }
+    if (c) { var ov = c.closest(OVERLAY); if (ov) closeDialog(ov, c.getAttribute('data-dialog-result') || undefined); }
   });
   document.addEventListener('pointerdown', function (e) {
     var ov = stack[stack.length - 1];
@@ -339,7 +340,7 @@
     var ov = stack[stack.length - 1]; if (!ov || drag) return;
     if (e.key === 'Escape') { if (!ov.hasAttribute('data-static') && !e.defaultPrevented) { e.preventDefault(); closeDialog(ov); } }
     else if (e.key === 'Tab') {
-      var f = focusables($('.dialog', ov) || ov); if (!f.length) { e.preventDefault(); return; }
+      var f = focusables($(PANEL, ov) || ov); if (!f.length) { e.preventDefault(); return; }
       var first = f[0], last = f[f.length - 1];
       if (e.shiftKey && (document.activeElement === first || !ov.contains(document.activeElement))) { e.preventDefault(); last.focus(); }
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
@@ -363,7 +364,7 @@
   };
 
   /* ═════════════ Menu ═════════════ */
-  function menuItems(m) { return $$('[role=menuitem]:not([disabled])', m); }
+  function menuItems(m) { return $$('[role=menuitem]:not([disabled])', m).filter(function (n) { return !n.hidden && n.offsetParent !== null; }); }
   function closeMenus(except, refocus) {
     $$('.menu:not([hidden])').forEach(function (m) {
       if (m === except) return;
@@ -440,16 +441,31 @@
   }
 
   /* ═════════════ Toast ═════════════ */
-  var CHECK = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg>';
+  var SVG = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
+  var TOAST_ICONS = {
+    success: SVG + '<path d="M5 12l4 4 10-10"/></svg>',
+    error: SVG + '<path d="M6 6l12 12M18 6L6 18"/></svg>',
+    info: SVG + '<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/></svg>',
+    warn: SVG + '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/></svg>'
+  };
+  var activeToasts = {};
+  /* NimbleUI.toast(text, {tone: 'success'|'info'|'warn'|'error'|'loading', duration: 3200, sticky: false})
+     The same text+tone while visible is not stacked: it shows (×n) and restarts its timer. Returns {el, dismiss()}. */
   NS.toast = function (text, o) {
     o = o || {};
+    var tone = o.tone === 'error' || o.tone === 'info' || o.tone === 'warn' || o.tone === 'loading' ? o.tone : 'success', key = tone + '|' + text;
     var box = $('.toasts');
     if (!box) { box = mk('div', 'toasts'); box.setAttribute('role', 'status'); box.setAttribute('aria-live', 'polite'); document.body.appendChild(box); }
-    var t = mk('div', 'toast' + (o.tone === 'warn' ? ' toast--warn' : ''));
-    t.innerHTML = CHECK; t.appendChild(mk('span', '', text));
+    var ex = activeToasts[key];
+    if (ex) { ex.count++; ex.msg.textContent = text + ' (×' + ex.count + ')'; clearTimeout(ex.timer); if (!o.sticky && tone !== 'loading') ex.timer = setTimeout(ex.dismiss, o.duration || 3200); return ex; }
+    var t = mk('div', 'toast toast--' + tone), icon = mk('span', 'toast__icon'), msg = mk('span', 'toast__message', text);
+    if (tone === 'loading') icon.appendChild(mk('span', 'spinner')); else icon.innerHTML = TOAST_ICONS[tone];
+    t.append(icon, msg);
     box.appendChild(t);
-    setTimeout(function () { t.remove(); }, o.duration || 3200);
-    return t;
+    var entry = { el: t, msg: msg, count: 1, timer: 0, dismiss: function () { clearTimeout(entry.timer); delete activeToasts[key]; t.remove(); } };
+    if (!o.sticky && tone !== 'loading') entry.timer = setTimeout(entry.dismiss, o.duration || 3200);
+    activeToasts[key] = entry;
+    return entry;
   };
 
   /* ═════════════ boot ═════════════ */
