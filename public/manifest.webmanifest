@@ -1,0 +1,11 @@
+{
+  "name": "Roadmaps",
+  "short_name": "Roadmaps",
+  "description": "Now / Next / Later roadmaps for your products, saved in your own Google Drive.",
+  "start_url": "/app",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
