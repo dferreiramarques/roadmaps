@@ -2,7 +2,7 @@
    Preference = auto | light | dark, stored in localStorage('nimble-theme'; absent = auto).
    Sets <html data-theme="light|dark"> (resolved) and data-theme-pref (the preference).
    Buttons: [data-theme-toggle] flips the resolved theme (explicit); [data-theme-set="auto|light|dark"] sets it
-   and gets aria-pressed. Add data-theme-icon to a toggle for an auto sun/moon icon. <meta name="nimble-theme-key" content="my-key"> reuses an existing storage key. Accent: <html data-accent="rose|indigo"> (omit for emerald). */
+   and gets aria-pressed. Fires document 'nimble:theme' {theme, pref} after every change. Add data-theme-icon to a toggle for an auto sun/moon icon. <meta name="nimble-theme-key" content="my-key"> reuses an existing storage key. Accent: <html data-accent="rose|indigo"> (omit for emerald). */
 (function () {
   var root = document.documentElement, KEY = 'nimble-theme';
   var metaKey = document.querySelector('meta[name="nimble-theme-key"]');   // optional: reuse an app's existing storage key
@@ -21,6 +21,7 @@
     // [data-theme-toggle][data-theme-icon]: shows the icon of the theme you would switch TO (in the button, or in a .theme-ico inside it)
     var ic = document.querySelectorAll('[data-theme-toggle][data-theme-icon]'), dark = root.getAttribute('data-theme') === 'dark';
     for (var j = 0; j < ic.length; j++) (ic[j].querySelector('.theme-ico') || ic[j]).innerHTML = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (dark ? SUN : MOON) + '</svg>';
+    document.dispatchEvent(new CustomEvent('nimble:theme', { detail: { theme: root.getAttribute('data-theme'), pref: p } }));   // apps can repaint their own icons/labels
   }
   function set(p) {
     try { if (p === 'auto') localStorage.removeItem(KEY); else localStorage.setItem(KEY, p); } catch (e) {}
